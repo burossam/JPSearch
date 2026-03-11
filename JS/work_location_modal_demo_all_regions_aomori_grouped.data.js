@@ -66,7 +66,6 @@ const SAITAMA_OMIYA_AREAS = [
   { code: "11103-oonaricho-2", name: "大成町2丁目（<rb>おおなりちょう</rb>）" },
   { code: "11103-oonaricho-3", name: "大成町3丁目（<rb>おおなりちょう</rb>）" },
 
-  { code: "11103-oohara", name: "大原（<rb>おおはら</rb>）" },
   // 大原：1〜5丁目は浦和区 → 大宮区は6・7丁目
   { code: "11103-oohara-6", name: "大原6丁目（<rb>おおはら</rb>）" },
   { code: "11103-oohara-7", name: "大原7丁目（<rb>おおはら</rb>）" },
@@ -101,6 +100,35 @@ const SAITAMA_OMIYA_AREAS = [
   { code: "11103-miyacho-2", name: "宮町2丁目（<rb>みやちょう</rb>）" },
   { code: "11103-miyacho-3", name: "宮町3丁目（<rb>みやちょう</rb>）" },
   { code: "11103-miyacho-4", name: "宮町4丁目（<rb>みやちょう</rb>）" },
+];
+
+// さいたま市浦和区：町名（デモ）
+// 仕様：name は「漢字（<rb>ひらがな</rb>）」形式にして <ruby> 表示させる
+const SAITAMA_URAWA_AREAS = [
+  // 大原：1〜5丁目は浦和区（大宮区は6・7丁目）
+  { code: "11107-oohara-1to5", name: "大原（<rb>おおはら</rb>）" },
+
+  { code: "11107-kamikizaki", name: "上木崎（<rb>かみきざき</rb>）" },
+  { code: "11107-kizaki", name: "木崎（<rb>きざき</rb>）" },
+  { code: "11107-kishicho", name: "岸町（<rb>きしちょう</rb>）" },
+  { code: "11107-kitaurawa", name: "北浦和（<rb>きたうらわ</rb>）" },
+  { code: "11107-kouzancho", name: "皇山町（<rb>こうざんちょう</rb>）" },
+  { code: "11107-komaba", name: "駒場（<rb>こまば</rb>）" },
+  { code: "11107-shinmei", name: "神明（<rb>しんめい</rb>）" },
+  { code: "11107-segasaki", name: "瀬ヶ崎（<rb>せがさき</rb>）" },
+  { code: "11107-takasago", name: "高砂（<rb>たかさご</rb>）" },
+  { code: "11107-daito", name: "大東（<rb>だいとう</rb>）" },
+  { code: "11107-tokiwa", name: "常盤（<rb>ときわ</rb>）" },
+  { code: "11107-nakacho", name: "仲町（<rb>なかちょう</rb>）" },
+  { code: "11107-harigaya", name: "針ヶ谷（<rb>はりがや</rb>）" },
+  { code: "11107-higashikishicho", name: "東岸町（<rb>ひがしきしちょう</rb>）" },
+  { code: "11107-higashitakasagocho", name: "東高砂町（<rb>ひがしたかさごちょう</rb>）" },
+  { code: "11107-higashinakacho", name: "東仲町（<rb>ひがしなかちょう</rb>）" },
+  { code: "11107-maeji", name: "前地（<rb>まえじ</rb>）" },
+  { code: "11107-misaki", name: "三崎（<rb>みさき</rb>）" },
+  { code: "11107-motomachi", name: "元町（<rb>もとちょう</rb>）" },
+  { code: "11107-motobuto", name: "本太（<rb>もとぶと</rb>）" },
+  { code: "11107-ryoke", name: "領家（<rb>りょうけ</rb>）" },
 ];
 
 const SAITAMA_MUNICIPALITIES = [
