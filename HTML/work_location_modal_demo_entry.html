@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>フィルター設定</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom" aria-label="グローバルナビゲーション">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-semibold" href="./work_location_modal_demo_entry.html">Job Demo</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#globalNav" aria-controls="globalNav" aria-expanded="false" aria-label="メニューを開く">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="globalNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link active" aria-current="page" href="./work_location_modal_demo_entry.html">ホーム</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=work">スケージュール</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=job">求人</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">統計分析</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">口コミ</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">人物一覧</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">マイページ</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid">
+    <nav class="py-2" aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="./work_location_modal_demo_entry.html">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">フィルター設定</li>
+      </ol>
+    </nav>
+  </div>
+
+  <div class="container-fluid py-4">
+    <div class="d-flex justify-content-start">
+      <div class="card shadow-sm" style="width: min(760px, 92vw);">
+        <div class="card-header d-flex align-items-center justify-content-between gap-3">
+          <div class="fw-bold">フィルター設定</div>
+          <div class="small text-muted text-end" style="white-space: nowrap;">
+            リンク先: <code>work_location_modal_demo_all_regions_aomori_grouped.html</code>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+              <thead class="table-light text-center">
+                <tr>
+                  <th scope="col" class="text-center" style="width: 64px;">№</th>
+                  <th scope="col" style="width: 140px;">項目</th>
+                  <th scope="col">選択内容</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-muted text-center">1</td>
+                  <td>
+                    <a class="btn btn-primary btn-sm fw-semibold" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=work">勤務地</a>
+                  </td>
+                  <td>
+                    <pre id="selectionOutput" class="small text-secondary mb-0" style="white-space: pre-wrap;">未選択</pre>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="text-muted text-center">2</td>
+                  <td>
+                    <a class="btn btn-primary btn-sm fw-semibold" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=station">最寄り駅</a>
+                  </td>
+                  <td>
+                    <pre id="stationSelectionOutput" class="small text-secondary mb-0" style="white-space: pre-wrap;">未選択</pre>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="text-muted text-center">3</td>
+                  <td>
+                    <a class="btn btn-primary btn-sm fw-semibold" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=job">職種</a>
+                  </td>
+                  <td>
+                    <pre id="jobSelectionOutput" class="small text-secondary mb-0" style="white-space: pre-wrap;">未選択</pre>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="text-muted text-center">4</td>
+                  <td>
+                    <a class="btn btn-primary btn-sm fw-semibold" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=pref">こだわり条件</a>
+                  </td>
+                  <td>
+                    <pre id="prefSelectionOutput" class="small text-secondary mb-0" style="white-space: pre-wrap;">未選択</pre>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="text-muted text-center">5</td>
+                  <td>
+                    <a class="btn btn-primary btn-sm fw-semibold" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=employment">雇用形態</a>
+                  </td>
+                  <td>
+                    <pre id="employmentSelectionOutput" class="small text-secondary mb-0" style="white-space: pre-wrap;">未選択</pre>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="text-muted text-center">6</td>
+                  <td>
+                    <a class="btn btn-primary btn-sm fw-semibold" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=salary">年収</a>
+                  </td>
+                  <td>
+                    <pre id="salarySelectionOutput" class="small text-secondary mb-0" style="white-space: pre-wrap;">未選択</pre>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td class="text-muted text-center">7</td>
+                  <td>
+                    <a class="btn btn-primary btn-sm fw-semibold" href="./work_location_modal_demo_all_regions_aomori_grouped.html?tab=skill">スキル</a>
+                  </td>
+                  <td>
+                    <pre id="skillSelectionOutput" class="small text-secondary mb-0" style="white-space: pre-wrap;">未選択</pre>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card-footer bg-white">
+          <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <button id="doSearchBtn" class="btn btn-danger fw-semibold" type="button">検索</button>
+            <button id="favoriteBtn" class="btn btn-outline-secondary fw-semibold" type="button">お気に入り</button>
+            <button id="clearSelectionBtn" class="btn btn-outline-secondary fw-semibold" type="button">クリア</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    (function () {
+      function safeParse(json) {
+        try { return JSON.parse(json); } catch { return null; }
+      }
+
+      function renderToPre(outEl, storageKey) {
+        if (!outEl) return;
+
+        var raw = null;
+        try { raw = localStorage.getItem(storageKey); } catch { raw = null; }
+        if (!raw) {
+          outEl.textContent = '未選択';
+          return;
+        }
+
+        var data = safeParse(raw);
+        if (!data || typeof data !== 'object') {
+          outEl.textContent = '未選択';
+          return;
+        }
+
+        if (Array.isArray(data.lines) && data.lines.length) {
+          outEl.textContent = data.lines.join('\n');
+          return;
+        }
+        if (typeof data.summary === 'string' && data.summary.trim()) {
+          outEl.textContent = data.summary;
+          return;
+        }
+
+        outEl.textContent = '未選択';
+      }
+
+      function renderPref(outEl) {
+        if (!outEl) return;
+
+        var goodRaw = null;
+        var badRaw = null;
+        try { goodRaw = localStorage.getItem('job:pref_selection'); } catch { goodRaw = null; }
+        try { badRaw = localStorage.getItem('job:pref_bad_selection'); } catch { badRaw = null; }
+
+        if (!goodRaw && !badRaw) {
+          outEl.textContent = '未選択';
+          return;
+        }
+
+        var lines = [];
+        if (goodRaw) {
+          var good = safeParse(goodRaw);
+          var goodText = (good && Array.isArray(good.lines) && good.lines.length) ? good.lines.join('\n')
+            : (good && typeof good.summary === 'string' ? good.summary : '');
+          if (goodText && goodText.trim()) {
+            lines.push('【良】');
+            lines.push(goodText);
+          }
+        }
+        if (badRaw) {
+          var bad = safeParse(badRaw);
+          var badText = (bad && Array.isArray(bad.lines) && bad.lines.length) ? bad.lines.join('\n')
+            : (bad && typeof bad.summary === 'string' ? bad.summary : '');
+          if (badText && badText.trim()) {
+            if (lines.length) lines.push('');
+            lines.push('【悪】');
+            lines.push(badText);
+          }
+        }
+
+        outEl.textContent = lines.length ? lines.join('\n') : '未選択';
+      }
+
+      renderToPre(document.getElementById('selectionOutput'), 'job:work_location_selection');
+      renderToPre(document.getElementById('stationSelectionOutput'), 'job:station_selection');
+      renderToPre(document.getElementById('jobSelectionOutput'), 'job:job_selection');
+      renderPref(document.getElementById('prefSelectionOutput'));
+      renderToPre(document.getElementById('employmentSelectionOutput'), 'job:employment_selection');
+      renderToPre(document.getElementById('salarySelectionOutput'), 'job:salary_selection');
+      renderToPre(document.getElementById('skillSelectionOutput'), 'job:skill_selection');
+    })();
+
+    (function () {
+      function getSaved(key) {
+        try { return localStorage.getItem(key); } catch { return null; }
+      }
+      function setFavorite(payload) {
+        try { localStorage.setItem('job:filter_favorite', JSON.stringify(payload)); return true; } catch { return false; }
+      }
+      function clearSaved() {
+        try {
+          localStorage.removeItem('job:work_location_selection');
+          localStorage.removeItem('job:station_selection');
+          localStorage.removeItem('job:job_selection');
+          localStorage.removeItem('job:pref_selection');
+          localStorage.removeItem('job:pref_bad_selection');
+          localStorage.removeItem('job:employment_selection');
+          localStorage.removeItem('job:salary_selection');
+          localStorage.removeItem('job:skill_selection');
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      var searchBtn = document.getElementById('doSearchBtn');
+      var favoriteBtn = document.getElementById('favoriteBtn');
+      var clearBtn = document.getElementById('clearSelectionBtn');
+      var out = document.getElementById('selectionOutput');
+      var outStation = document.getElementById('stationSelectionOutput');
+      var outJob = document.getElementById('jobSelectionOutput');
+      var outPref = document.getElementById('prefSelectionOutput');
+      var outEmployment = document.getElementById('employmentSelectionOutput');
+      var outSalary = document.getElementById('salarySelectionOutput');
+      var outSkill = document.getElementById('skillSelectionOutput');
+
+      if (searchBtn) {
+        searchBtn.addEventListener('click', function () {
+          var rawWork = getSaved('job:work_location_selection');
+          var rawStation = getSaved('job:station_selection');
+          var rawJob = getSaved('job:job_selection');
+          var rawPref = getSaved('job:pref_selection');
+          var rawBadPref = getSaved('job:pref_bad_selection');
+          var rawEmployment = getSaved('job:employment_selection');
+          var rawSalary = getSaved('job:salary_selection');
+          var rawSkill = getSaved('job:skill_selection');
+
+          if (!rawWork && !rawStation && !rawJob && !rawPref && !rawBadPref && !rawEmployment && !rawSalary && !rawSkill) {
+            alert('未選択です（デモ）');
+            return;
+          }
+
+          var lines = [];
+          lines.push('検索（デモ）');
+          lines.push('');
+          lines.push('【勤務地】');
+          lines.push(out ? out.textContent : '未選択');
+          lines.push('');
+          lines.push('【最寄り駅】');
+          lines.push(outStation ? outStation.textContent : '未選択');
+          lines.push('');
+          lines.push('【職種】');
+          lines.push(outJob ? outJob.textContent : '未選択');
+          lines.push('');
+          lines.push('【こだわり条件】');
+          lines.push(outPref ? outPref.textContent : '未選択');
+          lines.push('');
+          lines.push('【雇用形態】');
+          lines.push(outEmployment ? outEmployment.textContent : '未選択');
+          lines.push('');
+          lines.push('【年収】');
+          lines.push(outSalary ? outSalary.textContent : '未選択');
+          lines.push('');
+          lines.push('【スキル】');
+          lines.push(outSkill ? outSkill.textContent : '未選択');
+          alert(lines.join('\n'));
+        });
+      }
+
+      if (favoriteBtn) {
+        favoriteBtn.addEventListener('click', function () {
+          var rawWork = getSaved('job:work_location_selection');
+          var rawStation = getSaved('job:station_selection');
+          var rawJob = getSaved('job:job_selection');
+          var rawPref = getSaved('job:pref_selection');
+          var rawBadPref = getSaved('job:pref_bad_selection');
+          var rawEmployment = getSaved('job:employment_selection');
+          var rawSalary = getSaved('job:salary_selection');
+          var rawSkill = getSaved('job:skill_selection');
+          if (!rawWork && !rawStation && !rawJob && !rawPref && !rawBadPref && !rawEmployment && !rawSalary && !rawSkill) {
+            alert('未選択のため保存できません（デモ）');
+            return;
+          }
+
+          var payload = {
+            savedAt: new Date().toISOString(),
+            work: rawWork ? rawWork : null,
+            station: rawStation ? rawStation : null,
+            job: rawJob ? rawJob : null,
+            pref: rawPref ? rawPref : null,
+            prefBad: rawBadPref ? rawBadPref : null,
+            employment: rawEmployment ? rawEmployment : null,
+            salary: rawSalary ? rawSalary : null,
+            skill: rawSkill ? rawSkill : null,
+          };
+
+          if (setFavorite(payload)) alert('お気に入りに保存しました（デモ）');
+          else alert('保存に失敗しました（Storage が使えない可能性）');
+        });
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          if (clearSaved()) {
+            if (out) out.textContent = '未選択';
+            if (outStation) outStation.textContent = '未選択';
+            if (outJob) outJob.textContent = '未選択';
+            if (outPref) outPref.textContent = '未選択';
+            if (outEmployment) outEmployment.textContent = '未選択';
+            if (outSalary) outSalary.textContent = '未選択';
+            if (outSkill) outSkill.textContent = '未選択';
+            alert('クリアしました（デモ）');
+          } else {
+            alert('クリアに失敗しました（Storage が使えない可能性）');
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

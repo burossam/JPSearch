@@ -1,0 +1,942 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background:#111827; }
+
+.modalBackdrop{
+  position: fixed;
+  inset: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 4vh 0;
+  background: rgba(0,0,0,.55);
+  z-index: 9999;
+}
+
+.modalBackdrop[hidden]{
+  display:none;
+}
+
+.modal{
+  width: 92vw;
+  height: 90vh;
+  margin: 4vh auto;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 18px 50px rgba(0,0,0,.35);
+  display:flex;
+  flex-direction:column;
+}
+
+.header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 12px 16px; border-bottom:1px solid #e5e7eb;
+  flex: 0 0 auto;
+}
+.tabs{ display:flex; gap:10px; flex-wrap:wrap; }
+.tab{ border:0; background:transparent; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:900; }
+.tab.active{ background:#eef2ff; color:#1d4ed8; }
+.close{ border:0; background:#f3f4f6; width:34px; height:34px; border-radius:8px; cursor:pointer; font-size:18px; }
+
+.content{
+  display:grid;
+  grid-template-columns: 340px 1fr;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* station/pref/employment/salary/skill の簡易タブは、左を畳んで右をフル幅にする */
+.modal.simpleMode .content{
+  grid-template-columns: 1fr;
+}
+
+.modal.simpleMode .left{
+  display:none;
+}
+
+/* salaryタブは左サイドバー（時給/月収/年収）を表示 */
+.modal.salaryMode .content{
+  grid-template-columns: 340px 1fr;
+}
+
+.modal.salaryMode .left{
+  display:block;
+}
+
+.left{
+  border-right:1px solid #e5e7eb;
+  padding: 12px;
+  overflow:auto;
+  min-height: 0;
+}
+.titleRow{ display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px; gap:10px; }
+.pill{ background:#eef2ff; color:#1d4ed8; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:1000; white-space:nowrap; }
+
+.region{ border:1px solid #e5e7eb; border-radius:10px; margin-bottom: 10px; overflow:hidden; }
+.regionHead{
+  width:100%; text-align:left; padding:10px 12px;
+  background:#f9fafb; border:0; cursor:pointer; font-weight:1000;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.chev{ opacity:.6; font-weight:1000; }
+.regionBody{ padding: 8px 12px; display:block; }
+.prefItem{ display:flex; gap:10px; align-items:center; padding:6px 0; cursor:pointer; font-weight:700; }
+
+/* ===== Job mode ===== */
+.modal.jobMode .cityGrid{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-color: #e5e7eb;
+}
+
+.jobCatList{
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+}
+
+.jobCatBtn{
+  width: 100%;
+  text-align:left;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 10px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 1000;
+  color:#0ea5e9;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+}
+
+.jobCatBtn:hover{ background:#f3f4f6; }
+
+.jobCatBtn.active{
+  background:#eef2ff;
+  border-color:#c7d2fe;
+  color:#1d4ed8;
+}
+
+.jobCatChevron{
+  color:#6b7280;
+  font-weight:1000;
+}
+
+.right{
+  padding: 12px;
+  overflow:hidden;
+  min-height: 0;
+  display:flex;
+  flex-direction:column;
+}
+
+.rightHead{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom:1px solid #e5e7eb;
+  flex: 0 0 auto;
+}
+.rightTitle{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+#prefTitle{ font-size: 18px; font-weight: 1000; }
+.muted{ color:#6b7280; font-size: 12px; font-weight:800; }
+
+.tools{ display:flex; gap: 12px; align-items:center; flex-wrap:wrap; }
+.search{ width: 260px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; }
+.onlyWrap{ display:flex; gap:6px; align-items:center; color:#374151; font-size: 13px; font-weight:900; }
+
+/* salary：希望額（最低/最大） */
+.salaryRangeBox{
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 10px 0 12px;
+  display:block;
+}
+
+.salaryRangeRow{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+}
+
+.salaryRangeLabel{
+  font-size: 12px;
+  font-weight: 1000;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.salaryRangeInput{
+  width: 180px;
+  max-width: 42vw;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 900;
+}
+
+.salaryRangeTable{
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.salaryRangeTable--twoCol td{
+  width: 50%;
+  vertical-align: top;
+}
+
+.salaryRangeTable--threeCol td{
+  width: 33.3333%;
+  vertical-align: top;
+}
+
+.salaryFieldGroup{
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+}
+
+.salaryField{
+  display:flex;
+  flex-direction:column;
+  gap: 8px;
+}
+
+.salaryFieldRow{
+  display:flex;
+  align-items:flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.salaryEstimate{
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.salaryEstimateRow{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.salaryEstimateKey{
+  color:#6b7280;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+
+.salaryEstimateVal{
+  font-weight: 1000;
+}
+
+/* salary：時給ページ（添付レイアウト） */
+.salaryHourlyTable{
+  width: 100%;
+  table-layout: fixed;
+}
+
+.salaryHourlyTable .salaryHourlyNo {
+  width: 40px;
+  text-align: center;
+  font-weight: 600;
+  padding-left: 6px;
+  padding-right: 6px;
+  white-space: nowrap;
+}
+
+.salaryHourlyTable thead th:first-child {
+  width: 40px;
+  text-align: center;
+  padding-left: 6px;
+  padding-right: 6px;
+  white-space: nowrap;
+}
+
+/* salary：月給ページ（画像レイアウト） */
+.salaryMonthlyTable{
+  width: 100%;
+  table-layout: fixed;
+}
+
+.salaryMonthlyNo{
+  width: 56px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.salaryMonthlyUnit,
+.salaryMonthlyTh{
+  text-align: center;
+  font-weight: 1000;
+}
+
+.salaryMonthlyTable thead th{
+  background: #d1d5db;
+}
+
+/* salary：年収ページ（画像レイアウト） */
+.salaryYearlyDesiredTable,
+.salaryYearlyGaugeTable{
+  width: 100%;
+  table-layout: fixed;
+}
+
+.salaryYearlyDesiredTable thead th,
+.salaryYearlyGaugeTable thead th{
+  background: #d1d5db;
+}
+
+.salaryYearlyGaugeWrap{
+  overflow: auto;
+  max-height: clamp(240px, 45vh, 560px);
+}
+
+.salaryYearlyGaugeTable thead th{
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.salaryYearlyNo{
+  width: 56px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.salaryYearlyUnit,
+.salaryYearlyTh{
+  text-align: center;
+  font-weight: 1000;
+}
+
+.salaryYearlyInputWrap{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.salaryYearlySuffix{
+  white-space: nowrap;
+  font-weight: 1000;
+}
+
+.salaryYearlyNote{
+  margin: 10px 0;
+  font-size: 12px;
+  font-weight: 1000;
+}
+
+.salaryYearlyPick{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.salaryYearlyCount{
+  width: 96px;
+  text-align: center;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.salaryMonthlyResult{
+  text-align: center;
+  font-weight: 1000;
+}
+
+/* 最大/最低 列（数値）を右寄せ */
+.salaryMonthlyTable tbody td:nth-child(3),
+.salaryMonthlyTable tbody td:nth-child(4){
+  text-align: right;
+}
+
+.salaryMonthlyTable tbody td:nth-child(3) input,
+.salaryMonthlyTable tbody td:nth-child(4) input{
+  text-align: right;
+}
+
+.salaryMonthlyTable tbody td:nth-child(3) .salaryMonthlyResult,
+.salaryMonthlyTable tbody td:nth-child(4) .salaryMonthlyResult{
+  text-align: right;
+}
+
+/* Bootstrap風（テーブルだけ） */
+.table{
+  width: 100%;
+  margin-bottom: 0;
+  color: #111827;
+  border-collapse: collapse;
+}
+
+.table-sm th,
+.table-sm td{
+  padding: 10px 12px;
+}
+
+.table-bordered th,
+.table-bordered td{
+  border: 1px solid #e5e7eb;
+}
+
+.align-middle th,
+.align-middle td{
+  vertical-align: middle;
+}
+
+.salaryHourlyTh{
+  font-size: 12px;
+  font-weight: 1000;
+  color: #111827;
+  background: #d1d5db;
+  text-align: center;
+}
+
+/* 最低/最大 列（数値）を右寄せ */
+.salaryHourlyTable tbody td:nth-child(3),
+.salaryHourlyTable tbody td:nth-child(4){
+  text-align: right;
+}
+
+.salaryHourlyTable tbody td:nth-child(3) input,
+.salaryHourlyTable tbody td:nth-child(4) input{
+  text-align: right;
+}
+
+.salaryHourlyLabel{
+  font-size: 12px;
+  font-weight: 1000;
+  color: #111827;
+  white-space: nowrap;
+  width: 40%;
+}
+
+.salaryHourlyCell{
+}
+
+.salaryHourlyNo{
+  width: 14%;
+}
+
+.salaryHourlyCell .salaryRangeInput{
+  width: 100%;
+  max-width: none;
+}
+
+.salaryHourlyResult{
+  font-weight: 1000;
+  color:#111827;
+  min-height: 22px;
+}
+
+.salaryPickGroup{
+  display:flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.salaryPickBtn{
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.salaryFieldLabel{
+  font-size: 12px;
+  font-weight: 1000;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.salaryRangeTable th{
+  text-align: left;
+  font-size: 12px;
+  font-weight: 1000;
+  color: #374151;
+  padding: 0 10px 8px;
+  white-space: nowrap;
+}
+
+.salaryRangeTable td{
+  padding: 0 10px;
+}
+
+@media (max-width: 860px){
+  .salaryRangeInput{ width: 150px; }
+}
+
+.areaBar{
+  display:flex;
+  gap: 12px;
+  align-items:center;
+  padding: 10px 0 0;
+}
+
+/* workタブでは検索UIを消し、エリアセレクトを右上ツール位置へ移動 */
+.modal.workToolsMode .areaBar{
+  padding: 0;
+  flex: 1 1 auto;
+}
+
+/* workタブ右ヘッダ：都道府県内すべて選択チェック */
+.prefAllPick{
+  display: inline-flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.prefAllPick input[type="checkbox"]{
+  width: 16px;
+  height: 16px;
+}
+
+/* workタブ右ヘッダ：総件数表示の位置合わせ */
+.modal.workToolsMode #cityCount{
+  margin-left: 12px;
+  white-space: nowrap;
+}
+
+.areaLeft{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.areaLabel{
+  font-size: 12px;
+  font-weight: 900;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.areaSelect{
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 900;
+}
+
+.areaCount{
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 1000;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.sectionTitleRow{
+  grid-column: 1 / -1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-weight: 1000;
+  padding: 10px 8px 4px;
+  margin-top: 6px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.sectionTitleRow:first-child{ border-top:none; margin-top:0; }
+
+.areaHeaderRight{
+  flex: 0 0 auto;
+  margin-left: auto;
+  display:flex;
+  align-items:center;
+}
+
+.areaMultiSelect{
+  width: 320px;
+  max-width: 42vw;
+  height: 92px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 800;
+}
+
+.sectionTitleRow--miyagi{
+  gap: 12px;
+}
+
+.areaHeaderLeft{
+  flex: 0 0 auto;
+  display:flex;
+  align-items:center;
+}
+
+.areaPick{
+  display:flex;
+  gap: 8px;
+  align-items:center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.areaHeaderTitle{
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cityGrid{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow:auto;
+  padding: 12px 4px;
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+  border: 2px solid #ef4444; /* 赤枠の確認用。不要なら消してOK */
+  border-radius: 8px;
+}
+
+/* salary：入力テーブルは赤枠（3列グリッド）の全幅を使う */
+.cityGrid .salaryRangeBox{
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+/* セクション単位で列数を変えたい時用（入れ子グリッド） */
+.cityGroupGrid{
+  grid-column: 1 / -1;
+  display:grid;
+  gap: 8px 16px;
+}
+
+/* 市区町村の“枠”表示（前橋市の枠と同系の用途） */
+.cityBox{
+  grid-column: 1 / -1;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
+}
+
+.cityBoxHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  font-weight: 1000;
+  padding: 6px 4px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.cityBoxPick{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cityGroupGrid--2col{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cityGroupGrid--3col{
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 前橋市枠：クレーム防止のため常に3列固定 */
+.cityGroupGrid.cityGroupGrid--maebashi{
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+/* 前橋枠（2列）の可読性を上げる：長い名称を省略せず折り返す */
+.cityGroupGrid--2col .cityItem{
+  align-items: flex-start;
+}
+
+.cityGroupGrid--2col .cityName{
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.cityGroupGrid--2col .countBadge{
+  padding: 3px 8px;
+}
+
+.cityItem{
+  display:flex; gap:8px; align-items:center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  cursor:pointer;
+  user-select:none;
+  min-width:0;
+}
+.cityItem:hover{ background:#f3f4f6; }
+.cityName{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:800; flex: 1 1 auto; }
+
+.cityName ruby{ ruby-position: over; }
+
+.cityName ruby rt{
+  font-size: 12px;
+  font-weight: 900;
+  color:#6b7280;
+}
+
+.countBadge{
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 1000;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background:#eef2ff;
+  color:#1d4ed8;
+  white-space:nowrap;
+}
+
+.empty{
+  grid-column: 1 / -1;
+  padding: 12px;
+  color:#6b7280;
+  font-weight:900;
+}
+
+.sectionTitle{
+  grid-column: 1 / -1;
+  font-weight: 1000;
+  padding: 10px 8px 4px;
+  margin-top: 6px;
+  border-top: 1px solid #e5e7eb;
+}
+.sectionTitle:first-child{ border-top:none; margin-top:0; }
+
+.subTitle{
+  grid-column: 1 / -1;
+  font-weight: 900;
+  padding: 6px 8px 2px;
+  color:#374151;
+  opacity:.9;
+}
+
+.badge{
+  display:inline-block;
+  font-size: 11px;
+  font-weight:900;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background:#f3f4f6;
+  margin-left: 8px;
+  color:#374151;
+}
+
+.akitaBox{
+  grid-column: 1 / -1;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 6px;
+}
+
+.akitaBoxHead{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  font-weight: 1000;
+  padding: 2px 4px 8px;
+  gap: 10px;
+}
+
+.akitaBoxLeft{
+  flex: 0 0 auto;
+  display:flex;
+  align-items:center;
+}
+
+.akitaBoxTitle{
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.akitaGroupTitle{
+  grid-column: 1 / -1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-weight: 1000;
+  padding: 10px 8px 4px;
+  margin-top: 6px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.akitaGroupTitle:first-child{ border-top:none; margin-top:0; }
+
+.akitaGroupLeft{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
+
+.akitaBoxGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.akitaBoxSub{
+  grid-column: 1 / -1;
+  font-weight: 900;
+  padding: 6px 8px 2px;
+  color:#374151;
+  opacity:.9;
+}
+
+/* ===== Yamagata city box ===== */
+.yamagataBox{
+  grid-column: 1 / -1;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 6px;
+}
+
+.yamagataBoxHead{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  font-weight: 1000;
+  padding: 2px 4px 8px;
+  gap: 10px;
+}
+
+.yamagataBoxLeft{
+  flex: 0 0 auto;
+  display:flex;
+  align-items:center;
+}
+
+.yamagataGroupLeft{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
+
+.yamagataBoxTitle{
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.yamagataBoxGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+/* ===== Fukushima city box ===== */
+.fukushimaBox{
+  grid-column: 1 / -1;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 6px;
+}
+
+.fukushimaBoxHead{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  font-weight: 1000;
+  padding: 2px 4px 8px;
+  gap: 10px;
+}
+
+.fukushimaBoxHead .badge{ margin-left:auto; }
+
+.fukushimaBoxLeft{
+  flex: 0 0 auto;
+  display:flex;
+  align-items:center;
+}
+
+.fukushimaBoxTitle{
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fukushimaBoxGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.fukushimaKanaTitle{
+  grid-column: 1 / -1;
+  font-weight: 900;
+  padding: 8px 8px 2px;
+  color:#374151;
+  opacity:.9;
+  border-top: 1px dashed #e5e7eb;
+  margin-top: 6px;
+}
+
+.fukushimaRegionBox{
+  grid-column: 1 / -1;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.fukushimaRegionBoxHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-weight: 1000;
+  padding: 2px 4px 8px;
+  gap: 10px;
+}
+
+.fukushimaRegionBoxLeft{
+  flex: 0 0 auto;
+  display:flex;
+  align-items:center;
+}
+
+.fukushimaRegionBoxTitle{
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fukushimaRegionGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.footer{
+  flex: 0 0 auto;
+  height: 72px;
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 10px 16px;
+  border-top:1px solid #e5e7eb;
+  background:#fbfbfb;
+  gap: 12px;
+}
+.label{ font-size: 11px; color:#6b7280; font-weight:900; }
+.summary{ font-weight:1000; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 55vw; }
+.actions{ display:flex; gap: 10px; }
+.btn{ border:0; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:1000; }
+.btn.ghost{ background:#f3f4f6; }
+.btn.primary{ background:#ef4444; color:#fff; }
