@@ -864,7 +864,21 @@ function getPoolForPref(prefCode) {
   if (prefCode === "08") return [...IBARAKI_ALL_CITIES];
   if (prefCode === "09") return [...TOCHIGI_ALL_CITIES];
   if (prefCode === "10") return [...GUNMA_ALL_CITIES];
-  if (prefCode === "11") return [...SAITAMA_SAITAMA_CITY_WARDS, ...SAITAMA_MUNICIPALITIES];
+  if (prefCode === "11") {
+    const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
+    const otherWardsRaw = wardsRaw.filter((c) => c?.code !== "11103");
+    const omiyaAreasRaw = Array.isArray(SAITAMA_OMIYA_AREAS) ? SAITAMA_OMIYA_AREAS : [];
+
+    const grouped = (typeof SAITAMA_GROUPED === "object" && SAITAMA_GROUPED) ? SAITAMA_GROUPED : {};
+    const groupOrder = ["埼玉東部", "埼玉西武", "埼玉南部", "埼玉北部", "秩父地域"];
+    const others = [];
+    for (const gName of groupOrder) {
+      const raw = Array.isArray(grouped[gName]) ? grouped[gName] : [];
+      others.push(...raw);
+    }
+
+    return [...otherWardsRaw, ...omiyaAreasRaw, ...others];
+  }
   if (prefCode === "13") return [...TOKYO_ALL_CITIES];
   if (prefCode === "14") return [...KANAGAWA_ALL_CITIES];
   return [];
@@ -873,21 +887,26 @@ function getPoolForPref(prefCode) {
 function renderSaitama() {
   const blocks = [];
   const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
+  const otherWardsRaw = wardsRaw.filter((c) => c?.code !== "11103");
+  const omiyaAreasRaw = Array.isArray(SAITAMA_OMIYA_AREAS) ? SAITAMA_OMIYA_AREAS : [];
   const grouped = (typeof SAITAMA_GROUPED === "object" && SAITAMA_GROUPED) ? SAITAMA_GROUPED : {};
   const groupOrder = ["埼玉東部", "埼玉西武", "埼玉南部", "埼玉北部", "秩父地域"];
 
   const areaKey = state.selectedArea || "all";
   const showSaitamaCity = (areaKey === "all");
-  const wardsVisible = showSaitamaCity ? applyFilters(wardsRaw) : [];
+  const otherWardsVisible = showSaitamaCity ? applyFilters(otherWardsRaw) : [];
+  const omiyaAreasVisible = showSaitamaCity ? applyFilters(omiyaAreasRaw) : [];
 
   const targetGroups = (areaKey === "all") ? groupOrder : groupOrder.filter((x) => x === areaKey);
 
   let visibleTotal = 0;
-  visibleTotal += wardsVisible.length;
+  visibleTotal += otherWardsVisible.length;
+  visibleTotal += omiyaAreasVisible.length;
 
-  // さいたま市（10区）：「すべて」表示時のみ
+  // さいたま市：区（大宮区は町丁目で別枠にする）
   if (showSaitamaCity) {
-    const wardsAllSelected = wardsRaw.length > 0 && wardsRaw.every((c) => isCitySelected("11", c.code));
+    const saitamaCityPoolRaw = [...otherWardsRaw, ...omiyaAreasRaw];
+    const wardsAllSelected = saitamaCityPoolRaw.length > 0 && saitamaCityPoolRaw.every((c) => isCitySelected("11", c.code));
     const wardsAllChecked = wardsAllSelected ? "checked" : "";
 
     blocks.push(
@@ -897,13 +916,33 @@ function renderSaitama() {
             `<input class="saitamaCitySelectAll" type="checkbox" ${wardsAllChecked} />` +
             `<span>さいたま市</span>` +
           `</label>` +
-          `<span class="badge">${wardsVisible.length}</span>` +
+          `<span class="badge">${otherWardsVisible.length}件</span>` +
         `</div>` +
         `<div class="cityGroupGrid cityGroupGrid--3col">` +
-          wardsVisible.map(cityRowHTML).join("") +
+          otherWardsVisible.map(cityRowHTML).join("") +
         `</div>` +
       `</div>`
     );
+
+    // 大宮区：町丁目
+    if (omiyaAreasVisible.length) {
+      const omiyaAllSelected = omiyaAreasRaw.length > 0 && omiyaAreasRaw.every((c) => isCitySelected("11", c.code));
+      const omiyaAllChecked = omiyaAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="omiyaAreaSelectAll" type="checkbox" ${omiyaAllChecked} />` +
+              `<span>大宮区</span>` +
+            `</label>` +
+            `<span class="badge">${omiyaAreasVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            omiyaAreasVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
   }
 
   // さいたま市以外：指定の5区分で表示（エリア選択に応じて絞り込み）
@@ -932,7 +971,8 @@ function renderSaitama() {
 
   if (cityCountEl) {
     const registered = new Set();
-    for (const c of wardsRaw) registered.add(c.code);
+    for (const c of otherWardsRaw) registered.add(c.code);
+    for (const c of omiyaAreasRaw) registered.add(c.code);
     for (const gName of groupOrder) {
       const raw = Array.isArray(grouped[gName]) ? grouped[gName] : [];
       for (const c of raw) registered.add(c.code);
@@ -4674,13 +4714,26 @@ document.addEventListener("change", (e) => {
     return;
   }
 
-  // 埼玉：さいたま市（10区）（全選択）
+  // 埼玉：さいたま市（大宮区は町丁目を含む）（全選択）
   if (t instanceof HTMLInputElement && t.matches("input.saitamaCitySelectAll")) {
     if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    for (const c of (Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [])) {
-      setCitySelected("11", c.code, checked);
-    }
+    const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
+    const otherWardsRaw = wardsRaw.filter((c) => c?.code !== "11103");
+    const omiyaAreasRaw = Array.isArray(SAITAMA_OMIYA_AREAS) ? SAITAMA_OMIYA_AREAS : [];
+    const pool = [...otherWardsRaw, ...omiyaAreasRaw];
+    for (const c of pool) setCitySelected("11", c.code, checked);
+    updateSummary();
+    renderCities();
+    return;
+  }
+
+  // 埼玉：大宮区（町丁目）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.omiyaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
+    const checked = t.checked;
+    const omiyaAreasRaw = Array.isArray(SAITAMA_OMIYA_AREAS) ? SAITAMA_OMIYA_AREAS : [];
+    for (const c of omiyaAreasRaw) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;

@@ -54,6 +54,55 @@ const SAITAMA_SAITAMA_CITY_WARDS = [
   { code: "11110", name: "岩槻区" },
 ];
 
+// さいたま市大宮区：町丁目（デモ）
+// 仕様：name は「漢字（<rb>ひらがな</rb>）」形式にして <ruby> 表示させる
+// 注意：他区に属する丁目は除外（ユーザー指定ルールに従う）
+const SAITAMA_OMIYA_AREAS = [
+  { code: "11103-azumacho", name: "東町（<rb>あずまちょう</rb>）" },
+  { code: "11103-amnumacho", name: "天沼町（<rb>あまぬまちょう</rb>）" },
+
+  // 大成町：4丁目は北区 → 大宮区は1〜3丁目のみ
+  { code: "11103-oonaricho-1", name: "大成町1丁目（<rb>おおなりちょう</rb>）" },
+  { code: "11103-oonaricho-2", name: "大成町2丁目（<rb>おおなりちょう</rb>）" },
+  { code: "11103-oonaricho-3", name: "大成町3丁目（<rb>おおなりちょう</rb>）" },
+
+  { code: "11103-oohara", name: "大原（<rb>おおはら</rb>）" },
+  // 大原：1〜5丁目は浦和区 → 大宮区は6・7丁目
+  { code: "11103-oohara-6", name: "大原6丁目（<rb>おおはら</rb>）" },
+  { code: "11103-oohara-7", name: "大原7丁目（<rb>おおはら</rb>）" },
+
+  { code: "11103-kamikochicho", name: "上小町（<rb>かみこちょう</rb>）" },
+  { code: "11103-kishikicho", name: "吉敷町（<rb>きしきちょう</rb>）" },
+  { code: "11103-kitabukurocho", name: "北袋町（<rb>きたぶくろちょう</rb>）" },
+
+  // 櫛引町：2丁目は北区 → 大宮区は1丁目のみ
+  { code: "11103-kushihikicho-1", name: "櫛引町1丁目（<rb>くしびきちょう</rb>）" },
+
+  { code: "11103-sakuragicho", name: "桜木町（<rb>さくらぎちょう</rb>）" },
+  { code: "11103-shitamachi", name: "下町（<rb>しもちょう</rb>）" },
+  { code: "11103-junoucho", name: "寿能町（<rb>じゅのうちょう</rb>）" },
+  { code: "11103-sengencho", name: "浅間町（<rb>せんげんちょう</rb>）" },
+  { code: "11103-daimoncho", name: "大門町（<rb>だいもんちょう</rb>）" },
+  { code: "11103-takahanacho", name: "高鼻町（<rb>たかはなちょう</rb>）" },
+  { code: "11103-dotecho", name: "土手町（<rb>どてちょう</rb>）" },
+  { code: "11103-nakacho", name: "仲町（<rb>なかちょう</rb>）" },
+  { code: "11103-nishikicho", name: "錦町（<rb>にしきちょう</rb>）" },
+  { code: "11103-horinouchicho", name: "堀の内町（<rb>ほりのうちちょう</rb>）" },
+
+  // 三橋：5・6丁目は西区 → 大宮区は1〜4丁目
+  { code: "11103-mihashi-1", name: "三橋1丁目（<rb>みはし</rb>）" },
+  { code: "11103-mihashi-2", name: "三橋2丁目（<rb>みはし</rb>）" },
+  { code: "11103-mihashi-3", name: "三橋3丁目（<rb>みはし</rb>）" },
+  { code: "11103-mihashi-4", name: "三橋4丁目（<rb>みはし</rb>）" },
+
+  // 宮町：他区に属する丁目があるため、デモでは丁目別コードで表現
+  // どの丁目が大宮区か確定したら、不要分を削除して調整する
+  { code: "11103-miyacho-1", name: "宮町1丁目（<rb>みやちょう</rb>）" },
+  { code: "11103-miyacho-2", name: "宮町2丁目（<rb>みやちょう</rb>）" },
+  { code: "11103-miyacho-3", name: "宮町3丁目（<rb>みやちょう</rb>）" },
+  { code: "11103-miyacho-4", name: "宮町4丁目（<rb>みやちょう</rb>）" },
+];
+
 const SAITAMA_MUNICIPALITIES = [
   // 市（さいたま市以外）
   { code: "11201", name: "川越市" },
