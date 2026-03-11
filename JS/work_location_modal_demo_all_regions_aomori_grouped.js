@@ -4317,7 +4317,13 @@ function renderCities() {
   }
 
   const prefCode = state.selectedPrefCode;
-  prefTitleEl.textContent = PREFS[prefCode]?.name ?? "未選択";
+  const prefName = PREFS[prefCode]?.name ?? "未選択";
+  // 埼玉県：地図へのリンクを付与（ユーザー要件）
+  if (prefCode === "11") {
+    prefTitleEl.innerHTML = `<a class="prefTitleLink" href="/assets/saitama_map.html" target="_blank" rel="noopener">${prefName}</a>`;
+  } else {
+    prefTitleEl.textContent = prefName;
+  }
 
   // workタブ：検索UI/選択中のみ を消し、エリアセレクト＋総件数のレイアウトに寄せる
   const workToolsMode = (state.activeTab === "work");

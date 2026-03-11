@@ -140,6 +140,8 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .rightTitle{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
 #prefTitle{ font-size: 18px; font-weight: 1000; }
+#prefTitle .prefTitleLink{ color: inherit; text-decoration: none; }
+#prefTitle .prefTitleLink:hover{ text-decoration: underline; }
 .muted{ color:#6b7280; font-size: 12px; font-weight:800; }
 
 .tools{ display:flex; gap: 12px; align-items:center; flex-wrap:wrap; }
