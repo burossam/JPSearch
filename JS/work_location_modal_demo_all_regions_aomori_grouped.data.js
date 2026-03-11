@@ -131,6 +131,23 @@ const SAITAMA_URAWA_AREAS = [
   { code: "11107-ryoke", name: "領家（<rb>りょうけ</rb>）" },
 ];
 
+// さいたま市中央区：町名（デモ）
+// 仕様：name は「漢字（<rb>ひらがな</rb>）」形式にして <ruby> 表示させる
+const SAITAMA_CHUO_AREAS = [
+  { code: "11105-uenmine", name: "上峰（<rb>うえみね</rb>）" },
+  { code: "11105-ennami", name: "円阿弥（<rb>えんなみ</rb>）" },
+  { code: "11105-ooto", name: "大戸（<rb>おおと</rb>）" },
+  { code: "11105-kamiochiai", name: "上落合（<rb>かみおちあい</rb>）" },
+  { code: "11105-sakuraoka", name: "桜丘（<rb>さくらおか</rb>）" },
+  { code: "11105-shimochiai", name: "下落合（<rb>しもおちあい</rb>）" },
+  { code: "11105-shintoshin", name: "新都心（<rb>しんとしん</rb>）" },
+  { code: "11105-shinnakazato", name: "新中里（<rb>しんなかざと</rb>）" },
+  { code: "11105-suzuya", name: "鈴谷（<rb>すずや</rb>）" },
+  { code: "11105-hachioji", name: "八王子（<rb>はちおうじ</rb>）" },
+  { code: "11105-hommachinishi", name: "本町西（<rb>ほんまちにし</rb>）" },
+  { code: "11105-hommachihigashi", name: "本町東（<rb>ほんまちひがし</rb>）" },
+];
+
 const SAITAMA_MUNICIPALITIES = [
   // 市（さいたま市以外）
   { code: "11201", name: "川越市" },
