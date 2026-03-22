@@ -1,5 +1,15 @@
 .vscode/
 
+# Node
+node_modules/
+
+# Env
+.env
+
+# User-provided boundary data & generated artifacts
+assets/boundaries/*.geojson
+assets/generated/
+
 # Excel (keep out of repo)
 東京都西部.xlsx
 ~$東京都西部.xlsx

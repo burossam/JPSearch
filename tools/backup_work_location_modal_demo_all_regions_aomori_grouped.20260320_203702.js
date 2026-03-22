@@ -1,324 +1,262 @@
-const PREFS = Object.fromEntries(REGIONS.flatMap(r => r.prefs.map(p => [p.code, p])));
+// @ts-check
+function renderGunma() {
+  const blocks = [];
+  let visibleTotal = 0;
 
-function renderLeftAccordion() {
-  const container = document.getElementById("regionContainer");
-  function alphaIndex(n) {
-    // 0 -> A, 1 -> B ... 25 -> Z, 26 -> AA ...
-    let x = Number.isFinite(n) ? Math.floor(n) : 0;
-    if (x < 0) x = 0;
-    let s = "";
-    do {
-      s = String.fromCharCode(65 + (x % 26)) + s;
-      x = Math.floor(x / 26) - 1;
-    } while (x >= 0);
-    return s;
-  }
-  container.innerHTML = REGIONS.map((r, idx) => `
-    <div class="region">
-      <button class="regionHead" type="button" data-acc="head" data-index="${idx}">
-        <span>${alphaIndex(idx)}. ${r.name}</span><span class="chev">▸</span>
-      </button>
-      <div class="regionBody" data-acc="body" data-index="${idx}" style="display:none;">
-        ${r.prefs.map(p => `
-          <label class="prefItem">
-            <input type="checkbox" name="pref" value="${p.code}">
-            ${p.name}
-          </label>
-        `).join("")}
-      </div>
-    </div>
-  `).join("");
-}
+  const areaKey = state.selectedArea || "all";
 
-// ====== UI helpers ======
-const state = {
-  activeTab: "work", // work | job | ...（このデモは work/job を実装）
-  selectedPrefCode: "",
-  selectedArea: "all",
-  selectedCities: new Set(),
-  selectedJobCategoryId: "",
-  selectedJobs: new Set(),
-  selectedStations: new Set(),
-  selectedStationArea: "all",
-  selectedPrefConditions: new Set(),
-  selectedEmployments: new Set(),
-  selectedSalaries: new Set(),
-  salaryActiveGroup: "yearly",
-  salaryDesiredByGroup: {
-    hourly: {
-      min: "", // 最低時給
-      max: "", // 最大時給
-      minHoursPerDay: "",
-      maxHoursPerDay: "",
-      daysPerWeek: "",
-      minDaysPerMonth: "",
-      maxDaysPerMonth: "",
-    },
-    monthly: {
-      min: "", // 最低（月給・万円）
-      max: "", // 最大（月給・万円）
-      bonusCountMin: "", // 最低ボーナス回数
-      bonusCountMax: "", // 最大ボーナス回数
-      bonusAmountMin: "", // 最低ボーナス金額（万円）
-      bonusAmountMax: "", // 最大ボーナス金額（万円）
-    },
-    yearly: { min: "", max: "" },
-  },
-  selectedSkills: new Set(),
-  selectedSkillGroup: "language",
-  // 「悪（除外）こだわり条件」専用
-  selectedBadPrefConditions: new Set(),
-  badPrefActiveGroup: "",
-};
-const $ = (sel) => document.querySelector(sel);
+  const allCitiesRaw = GUNMA_ALL_CITIES;
 
-const cityListEl = $("#cityList");
-const prefTitleEl = $("#prefTitle");
-const cityCountEl = $("#cityCount");
-const selectedCountEl = $("#selectedCount");
-const selectedSummaryEl = $("#selectedSummary");
-const citySearchEl = $("#citySearch");
-const onlySelectedEl = $("#onlySelected");
-const areaBarEl = $("#areaBar");
-const areaLabelEl = $("#areaLabel");
-const areaSelectEl = $("#areaSelect");
-const areaCountEl = $("#areaCount");
-
-const rightTitleEl = document.querySelector(".rightHead .rightTitle");
-const rightToolsEl = document.querySelector(".rightHead .tools");
-const onlyWrapEl = onlySelectedEl ? onlySelectedEl.closest(".onlyWrap") : null;
-const areaBarHomeParentEl = areaBarEl ? areaBarEl.parentElement : null;
-const areaBarHomeNextSibling = areaBarEl ? areaBarEl.nextSibling : null;
-const cityCountHomeParentEl = cityCountEl ? cityCountEl.parentElement : null;
-const cityCountHomeNextSibling = cityCountEl ? cityCountEl.nextSibling : null;
-
-const stationAreaWrapEl = document.getElementById("stationAreaWrap");
-const stationAreaSelectEl = document.getElementById("stationAreaSelect");
-
-// ====== Simple tabs (station/pref/employment/salary/skill) ======
-const SIMPLE_TAB_META = {
-  station: {
-    title: "最寄り駅",
-    storageKey: "job:station_selection",
-    placeholder: "駅を検索",
-  },
-  pref: {
-    title: "こだわり条件",
-    storageKey: "job:pref_selection",
-    placeholder: "条件を検索",
-  },
-  employment: {
-    title: "雇用形態",
-    storageKey: "job:employment_selection",
-    placeholder: "雇用形態を検索",
-  },
-  salary: {
-    title: "手取り給料",
-    storageKey: "job:salary_selection",
-    placeholder: "年収を検索",
-  },
-  skill: {
-    title: "スキル",
-    storageKey: "job:skill_selection",
-    placeholder: "スキルを検索",
-  },
-};
-
-const STATION_AREAS = [
-  { value: "all", label: "すべて" },
-  { value: "main", label: "主要駅" },
-  { value: "sub", label: "その他" },
-];
-
-let _allStationOptionsCache = null;
-function getAllStationOptions() {
-  if (Array.isArray(_allStationOptionsCache)) return _allStationOptionsCache;
-
-  // デモ用：都道府県ごとに簡易な駅候補を生成（左の都道府県選択と連動させるため）
-  // 実データ（路線/駅マスタ）に差し替える前提。
-  const prefs = Object.entries(PREFS)
-    .map(([code, p]) => ({ code, name: p?.name ?? code }))
-    .sort((a, b) => a.code.localeCompare(b.code, "ja"));
-
-  const options = [];
-  for (const pref of prefs) {
-    const base = String(pref.name || pref.code);
-    options.push({ code: `st-${pref.code}-01`, name: `${base}駅`, area: "main", prefCode: pref.code });
-    options.push({ code: `st-${pref.code}-02`, name: `新${base}駅`, area: "main", prefCode: pref.code });
-    options.push({ code: `st-${pref.code}-03`, name: `${base}中央駅`, area: "sub", prefCode: pref.code });
-    options.push({ code: `st-${pref.code}-04`, name: `${base}県庁前駅`, area: "sub", prefCode: pref.code });
+  // 「すべて」表示時のみ、最上段に「群馬県（全選択）」を出す
+  if (areaKey === "all") {
+    const listAllVisible = applyFilters(allCitiesRaw);
+    const prefAllSelected = allCitiesRaw.length > 0 && allCitiesRaw.every((c) => isCitySelected("10", c.code));
+    const prefAllChecked = prefAllSelected ? "checked" : "";
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="gunmaPrefSelectAll" type="checkbox" ${prefAllChecked} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">群馬県</span>` +
+        `<span class="badge">${listAllVisible.length}件</span>` +
+      `</div>`
+    );
   }
 
-  _allStationOptionsCache = options;
-  return options;
-}
+  // 前橋（枠）
+  if (areaKey === "all" || areaKey === "前橋市") {
+    const maebashiCity = { code: "10201", name: "前橋市" };
+    const maebashiAreasRaw = (Array.isArray(GUNMA_MAEBASHI_AREAS) ? GUNMA_MAEBASHI_AREAS : []);
 
-function getCheckedPrefCodes() {
-  return Array.from(document.querySelectorAll('input[name="pref"]:checked'))
-    .map((x) => x.value)
-    .filter(Boolean);
-}
+    // チェックの対象は「前橋市 + 地区」だが、表示は「地区のみ」にする（重複の前橋市行を消す）
+    const maebashiPool = [maebashiCity, ...maebashiAreasRaw];
+    const maebashiAreasVisible = applyFilters(maebashiAreasRaw);
+    visibleTotal += maebashiAreasVisible.length;
 
-function ensureStationAreaOptions() {
-  if (!stationAreaSelectEl) return;
-  const current = stationAreaSelectEl.value || state.selectedStationArea || "all";
-  stationAreaSelectEl.innerHTML = STATION_AREAS
-    .map((x) => `<option value="${x.value}">${x.label}</option>`)
-    .join("");
-  const exists = STATION_AREAS.some((x) => x.value === current);
-  stationAreaSelectEl.value = exists ? current : "all";
-  state.selectedStationArea = stationAreaSelectEl.value;
-}
+    const maebashiAllSelected = maebashiPool.length > 0 && maebashiPool.every((c) => isCitySelected("10", c.code));
+    const maebashiAllChecked = maebashiAllSelected ? "checked" : "";
 
-const PREF_GROUPS = ["働き方", "待遇", "職場環境"];
-const PREF_OPTIONS = [
-  { code: "pref-remote", name: "在宅OK", group: "働き方" },
-  { code: "pref-flex", name: "フレックス", group: "働き方" },
-  { code: "pref-side", name: "副業OK", group: "働き方" },
-  { code: "pref-overtime", name: "残業少なめ", group: "働き方" },
-  { code: "pref-bonus", name: "賞与あり", group: "待遇" },
-  { code: "pref-raise", name: "昇給あり", group: "待遇" },
-  { code: "pref-allow", name: "交通費支給", group: "待遇" },
-  { code: "pref-insurance", name: "社会保険完備", group: "待遇" },
-  { code: "pref-kids", name: "子育て支援", group: "職場環境" },
-  { code: "pref-nonsmoke", name: "屋内禁煙", group: "職場環境" },
-];
+    // ヘッダ：左にチェック、右に件数
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="gunmaMaebashiSelectAll" type="checkbox" ${maebashiAllChecked} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">前橋市</span>` +
+        `<span class="badge">${maebashiAreasVisible.length}件</span>` +
+      `</div>`
+    );
 
-const EMPLOYMENT_OPTIONS = [
-  { code: "emp-full", name: "正社員" },
-  { code: "emp-contract", name: "契約社員" },
-  { code: "emp-part", name: "パート・アルバイト" },
-  { code: "emp-temp", name: "派遣" },
-  { code: "emp-freelance", name: "業務委託" },
-];
-
-const SALARY_OPTIONS = [
-  // 時給
-  { code: "sal-h-1000", name: "時給1000円以上", group: "hourly" },
-  { code: "sal-h-1200", name: "時給1200円以上", group: "hourly" },
-  { code: "sal-h-1500", name: "時給1500円以上", group: "hourly" },
-  // 月収
-  { code: "sal-m-20", name: "月収20万円以上", group: "monthly" },
-  { code: "sal-m-25", name: "月収25万円以上", group: "monthly" },
-  { code: "sal-m-30", name: "月収30万円以上", group: "monthly" },
-  // 年収
-  { code: "sal-y-300", name: "年収300万以上", group: "yearly" },
-  { code: "sal-y-400", name: "年収400万以上", group: "yearly" },
-  { code: "sal-y-500", name: "年収500万以上", group: "yearly" },
-  { code: "sal-y-600", name: "年収600万以上", group: "yearly" },
-  { code: "sal-y-800", name: "年収800万以上", group: "yearly" },
-];
-
-const SALARY_GROUPS = [
-  { id: "hourly", label: "時給" },
-  { id: "monthly", label: "月給" },
-  { id: "yearly", label: "年収" },
-];
-
-// salary：年収ゲージ（画像レイアウト用）
-// 重複があると同じ文言が連続表示されるため、値はユニークにする
-const YEARLY_GAUGE_AMOUNTS_MAN = Array.from({ length: 27 }, (_, i) => 200 + i * 50); // 200..1500（50刻み）
-
-function getSalaryGroupLabel(groupId) {
-  const g = (groupId || "").trim();
-  return SALARY_GROUPS.find((x) => x.id === g)?.label ?? "年収";
-}
-
-function getSalaryDesiredForActiveGroup() {
-  const group = state.salaryActiveGroup || "yearly";
-  const base = { min: "", max: "" };
-  if (!state.salaryDesiredByGroup) state.salaryDesiredByGroup = { hourly: base, monthly: base, yearly: base };
-  if (!state.salaryDesiredByGroup.hourly) {
-    state.salaryDesiredByGroup.hourly = {
-      ...base,
-      minHoursPerDay: "",
-      maxHoursPerDay: "",
-      daysPerWeek: "",
-      minDaysPerMonth: "",
-      maxDaysPerMonth: "",
-    };
-  } else {
-    // 既存データ互換（後から項目追加した場合）
-    if (typeof state.salaryDesiredByGroup.hourly.minHoursPerDay !== "string") state.salaryDesiredByGroup.hourly.minHoursPerDay = "";
-    if (typeof state.salaryDesiredByGroup.hourly.maxHoursPerDay !== "string") state.salaryDesiredByGroup.hourly.maxHoursPerDay = "";
-    if (typeof state.salaryDesiredByGroup.hourly.daysPerWeek !== "string") state.salaryDesiredByGroup.hourly.daysPerWeek = "";
-    if (typeof state.salaryDesiredByGroup.hourly.minDaysPerMonth !== "string") state.salaryDesiredByGroup.hourly.minDaysPerMonth = "";
-    if (typeof state.salaryDesiredByGroup.hourly.maxDaysPerMonth !== "string") state.salaryDesiredByGroup.hourly.maxDaysPerMonth = "";
-  }
-  if (!state.salaryDesiredByGroup.monthly) {
-    state.salaryDesiredByGroup.monthly = {
-      ...base,
-      bonusCountMin: "",
-      bonusCountMax: "",
-      bonusAmountMin: "",
-      bonusAmountMax: "",
-    };
-  } else {
-    // 既存データ互換（後から項目追加した場合）
-    if (typeof state.salaryDesiredByGroup.monthly.bonusCountMin !== "string") state.salaryDesiredByGroup.monthly.bonusCountMin = "";
-    if (typeof state.salaryDesiredByGroup.monthly.bonusCountMax !== "string") state.salaryDesiredByGroup.monthly.bonusCountMax = "";
-    if (typeof state.salaryDesiredByGroup.monthly.bonusAmountMin !== "string") state.salaryDesiredByGroup.monthly.bonusAmountMin = "";
-    if (typeof state.salaryDesiredByGroup.monthly.bonusAmountMax !== "string") state.salaryDesiredByGroup.monthly.bonusAmountMax = "";
-  }
-  if (!state.salaryDesiredByGroup.yearly) state.salaryDesiredByGroup.yearly = { ...base };
-  return state.salaryDesiredByGroup[group] ?? state.salaryDesiredByGroup.yearly;
-}
-
-function toNum(v) {
-  const s = (v ?? "").toString().trim();
-  if (!s) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n)) return null;
-  return n;
-}
-
-function yen(n) {
-  if (!Number.isFinite(n)) return "";
-  return `${Math.round(n).toLocaleString("ja-JP")}円`;
-}
-
-function yenRange(minV, maxV) {
-  const a = (Number.isFinite(minV)) ? yen(minV) : "";
-  const b = (Number.isFinite(maxV)) ? yen(maxV) : "";
-  if (a && b) return `${a}〜${b}`;
-  return a || b || "";
-}
-
-function calcMinDaysPerMonthFromDaysPerWeek(daysPerWeek) {
-  const d = toNum(daysPerWeek);
-  if (!Number.isFinite(d)) return "";
-  const clamped = Math.max(0, Math.min(7, Math.floor(d)));
-  return String(clamped * 4);
-}
-
-function updateSalaryEstimateUI() {
-  if (state.activeTab !== "salary") return;
-  const el = document.getElementById("salaryEstimate");
-  if (!el) return;
-
-  const group = state.salaryActiveGroup || "yearly";
-  const desired = getSalaryDesiredForActiveGroup();
-  const min = toNum(desired?.min);
-  const max = toNum(desired?.max);
-
-  if (group === "hourly") {
-    // 時給は画面内テーブルで「合計月収」を直接出すため、ここでは何も出さない
-    el.textContent = "";
-    return;
+    // 前橋市枠は常に3列固定（ここだけは崩さない）
+    blocks.push(
+      `<div class="cityGroupGrid cityGroupGrid--maebashi">` +
+        maebashiAreasVisible.map(cityRowHTML).join("") +
+      `</div>`
+    );
   }
 
-  if (group === "monthly") {
-    if (!Number.isFinite(min) && !Number.isFinite(max)) {
-      el.textContent = "月給（最低/最大）を入れると、年収の目安が表示されます";
-      return;
+  // 高崎（枠）
+  if (areaKey === "all" || areaKey === "高崎市") {
+    const takasakiCity = { code: "10202", name: "高崎市" };
+    const takasakiRaw = [takasakiCity, ...(Array.isArray(GUNMA_TAKASAKI_AREAS) ? GUNMA_TAKASAKI_AREAS : [])];
+    const takasakiVisible = applyFilters(takasakiRaw);
+    visibleTotal += takasakiVisible.length;
+
+    const takasakiAllSelected = takasakiRaw.length > 0 && takasakiRaw.every((c) => isCitySelected("10", c.code));
+    const takasakiAllChecked = takasakiAllSelected ? "checked" : "";
+
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="gunmaTakasakiSelectAll" type="checkbox" ${takasakiAllChecked} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">高崎市</span>` +
+        `<span class="badge">${takasakiVisible.length}件</span>` +
+      `</div>`
+    );
+
+    // 高崎枠は3列固定
+    blocks.push(
+      `<div class="cityGroupGrid cityGroupGrid--3col">` +
+        takasakiVisible.map(cityRowHTML).join("") +
+      `</div>`
+    );
+  }
+
+  // 太田市（枠）
+  if (areaKey === "all" || areaKey === "太田市") {
+    const otaCity = { code: "10205", name: "太田市" };
+    const otaAreasRaw = (Array.isArray(GUNMA_OTA_AREAS) ? GUNMA_OTA_AREAS : []);
+
+    // チェックの対象は「太田市 + 町名」だが、表示は「町名のみ」にする（重複の太田市行を消す）
+    const otaPool = [otaCity, ...otaAreasRaw];
+    const otaAreasVisible = applyFilters(otaAreasRaw);
+    visibleTotal += otaAreasVisible.length;
+
+    const otaAllSelected = otaPool.length > 0 && otaPool.every((c) => isCitySelected("10", c.code));
+    const otaAllChecked = otaAllSelected ? "checked" : "";
+
+    // ヘッダ：左にチェック、右に件数
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="gunmaOtaSelectAll" type="checkbox" ${otaAllChecked} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">太田市</span>` +
+        `<span class="badge">${otaAreasVisible.length}件</span>` +
+      `</div>`
+    );
+
+    // 太田市枠（町名）は3列固定
+    blocks.push(
+      `<div class="cityGroupGrid cityGroupGrid--3col">` +
+        otaAreasVisible.map(cityRowHTML).join("") +
+      `</div>`
+    );
+  }
+
+  // 伊勢崎市（枠）
+  if (areaKey === "all" || areaKey === "伊勢崎市") {
+    const isesakiCity = { code: "10204", name: "伊勢崎市" };
+    const isesakiAreasRaw = (Array.isArray(GUNMA_ISESAKI_AREAS) ? GUNMA_ISESAKI_AREAS : []);
+
+    // チェックの対象は「伊勢崎市 + 町名」だが、表示は「町名のみ」にする（重複の伊勢崎市行を消す）
+    const isesakiPool = [isesakiCity, ...isesakiAreasRaw];
+    const isesakiAreasVisible = applyFilters(isesakiAreasRaw);
+    visibleTotal += isesakiAreasVisible.length;
+
+    const isesakiAllSelected =
+      isesakiPool.length > 0 && isesakiPool.every((c) => isCitySelected("10", c.code));
+    const isesakiAllChecked = isesakiAllSelected ? "checked" : "";
+
+    // ヘッダ：左にチェック、右に件数
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="gunmaIsesakiSelectAll" type="checkbox" ${isesakiAllChecked} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">伊勢崎市</span>` +
+        `<span class="badge">${isesakiAreasVisible.length}件</span>` +
+      `</div>`
+    );
+
+    // 伊勢崎市枠（町名）は3列固定
+    blocks.push(
+      `<div class="cityGroupGrid cityGroupGrid--3col">` +
+        isesakiAreasVisible.map(cityRowHTML).join("") +
+      `</div>`
+    );
+  }
+
+  // 桐生市（枠）
+  if (areaKey === "all" || areaKey === "桐生市") {
+    const kiryuCity = { code: "10203", name: "桐生市" };
+    const kiryuGroupedRaw = (typeof GUNMA_KIRYU_AREAS_GROUPED === "object" && GUNMA_KIRYU_AREAS_GROUPED)
+      ? GUNMA_KIRYU_AREAS_GROUPED
+      : {};
+
+    const groupOrder = [
+      "中央地域",
+      "新里地域",
+      "黒保根地域",
+      "桐生市その他",
+    ];
+
+    const kiryuAreasRaw = groupOrder.flatMap((k) => (Array.isArray(kiryuGroupedRaw[k]) ? kiryuGroupedRaw[k] : []));
+    const kiryuPool = [kiryuCity, ...kiryuAreasRaw];
+
+    let kiryuVisibleTotal = 0;
+    const groupVisibleMap = Object.fromEntries(
+      groupOrder.map((k) => {
+        const raw = (Array.isArray(kiryuGroupedRaw[k]) ? kiryuGroupedRaw[k] : []);
+        const visible = applyFilters(raw);
+        kiryuVisibleTotal += visible.length;
+        return [k, visible];
+      })
+    );
+
+    visibleTotal += kiryuVisibleTotal;
+
+    const kiryuAllSelected = kiryuPool.length > 0 && kiryuPool.every((c) => isCitySelected("10", c.code));
+    const kiryuAllChecked = kiryuAllSelected ? "checked" : "";
+
+    // ヘッダ：左にチェック、右に件数
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="gunmaKiryuSelectAll" type="checkbox" ${kiryuAllChecked} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">桐生市</span>` +
+        `<span class="badge">${kiryuVisibleTotal}件</span>` +
+      `</div>`
+    );
+
+    // 桐生市枠（町名）は3列固定。見出しは枠内で全幅表示
+    const inner = [];
+    for (const k of groupOrder) {
+      const visible = groupVisibleMap[k] ?? [];
+      if (visible.length === 0) continue;
+      inner.push(`<div class="subTitle">${k}<span class="badge">${visible.length}件</span></div>`);
+      inner.push(...visible.map(cityRowHTML));
     }
 
-    const monthText = yenRange(min, max);
-    const yearMin = Number.isFinite(min) ? (min * 12) : null;
-    const yearMax = Number.isFinite(max) ? (max * 12) : null;
-    const yearText = yenRange(yearMin, yearMax);
+    blocks.push(
+      `<div class="cityGroupGrid cityGroupGrid--3col">` +
+        inner.join("") +
+      `</div>`
+    );
+  }
 
-    el.innerHTML = `
+  // その他枠：群馬の地方区分（中毛/西毛/東毛/北毛）
+  {
+    const groupOrder = ["中毛", "西毛", "東毛", "北毛"];
+    for (const gName of groupOrder) {
+      if (areaKey !== "all" && areaKey !== gName) continue;
+      const raw = (typeof GUNMA_GROUPED === "object" && GUNMA_GROUPED) ? (GUNMA_GROUPED[gName] ?? []) : [];
+      const visible = applyFilters(raw);
+      if (visible.length === 0) continue;
+      visibleTotal += visible.length;
+
+      const allSelected = raw.length > 0 && raw.every((c) => isCitySelected("10", c.code));
+      const allChecked = allSelected ? "checked" : "";
+
+      blocks.push(
+        `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+          `<span class="areaHeaderLeft">` +
+            `<label class="areaPick">` +
+              `<input class="gunmaGroupSelectAll" data-area="${gName}" type="checkbox" ${allChecked} />` +
+            `</label>` +
+          `</span>` +
+          `<span class="areaHeaderTitle">${gName}</span>` +
+          `<span class="badge">${visible.length}件</span>` +
+        `</div>`
+      );
+
+      // 地方区分も「市区町村行は常に3列固定」にする
+      blocks.push(
+        `<div class="cityGroupGrid cityGroupGrid--3col">` +
+          visible.map(cityRowHTML).join("") +
+        `</div>`
+      );
+    }
+  }
+
+  cityListEl.innerHTML = blocks.length ? blocks.join("") : `<div class="empty">該当なし</div>`;
+  cityCountEl.textContent = `登録：${allCitiesRaw.length}件`;
+  setAreaCount(`表示：${visibleTotal}件`);
+}
       <div class="salaryEstimateRow"><span class="salaryEstimateKey">月収の目安</span><span class="salaryEstimateVal">${monthText || "-"}</span></div>
       <div class="salaryEstimateRow"><span class="salaryEstimateKey">年収の目安</span><span class="salaryEstimateVal">${yearText || "-"}</span></div>
     `;
@@ -351,85 +289,33 @@ function renderSalaryLeft() {
   `;
 }
 
-const SKILL_GROUPS = [
-  {
-    id: "language",
-    name: "言語",
-    options: [
-      { code: "skl-java", name: "Java", count: 164 },
-      { code: "skl-csharp", name: "C#", count: 145 },
-      { code: "skl-php", name: "PHP", count: 151 },
-      { code: "skl-python", name: "Python", count: 161 },
-      { code: "skl-javascript", name: "JavaScript", count: 151 },
-      { code: "skl-go", name: "Go", count: 105 },
-      { code: "skl-kotlin", name: "Kotlin", count: 102 },
-      { code: "skl-r", name: "R", count: 41 },
-      { code: "skl-cpp", name: "C++", count: 127 },
-      { code: "skl-ruby", name: "Ruby", count: 115 },
-      { code: "skl-perl", name: "Perl", count: 61 },
-      { code: "skl-html-css", name: "HTML・CSS", count: 101 },
-      { code: "skl-scala", name: "Scala", count: 41 },
-      { code: "skl-swift", name: "Swift", count: 104 },
-      { code: "skl-typescript", name: "TypeScript", count: 126 },
-      { code: "skl-shell", name: "Shell", count: 54 },
-    ],
-  },
-  {
-    id: "framework",
-    name: "フレームワーク",
-    options: [
-      { code: "skl-cakephp", name: "CakePHP", count: 66 },
-      { code: "skl-laravel", name: "Laravel", count: 100 },
-      { code: "skl-vue", name: "Vue.js", count: 110 },
-      { code: "skl-angular", name: "Angular", count: 67 },
-      { code: "skl-spring", name: "Spring", count: 102 },
-      { code: "skl-rails", name: "Ruby on rails", count: 85 },
-      { code: "skl-react", name: "React", count: 109 },
-      { code: "skl-node", name: "Node.js", count: 90 },
-      { code: "skl-angularjs", name: "AngularJS", count: 62 },
-      { code: "skl-django", name: "Django", count: 67 },
-    ],
-  },
-  {
-    id: "other",
-    name: "その他",
-    options: [
-      { code: "skl-aws", name: "AWS", count: 141 },
-      { code: "skl-azure", name: "Azure", count: 112 },
-      { code: "skl-github", name: "GitHub", count: 73 },
-      { code: "skl-nginx", name: "Nginx", count: 23 },
-      { code: "skl-mysql", name: "MySQL", count: 117 },
-      { code: "skl-oracle", name: "Oracle", count: 96 },
-      { code: "skl-gcp", name: "GCP", count: 91 },
-      { code: "skl-docker", name: "Docker", count: 67 },
-      { code: "skl-kubernetes", name: "Kubernetes", count: 42 },
-      { code: "skl-sql", name: "SQL", count: 100 },
-      { code: "skl-postgresql", name: "PostgreSQL", count: 74 },
-    ],
-  },
+const SKILL_OPTIONS = [
+  { code: "skl-excel", name: "Excel" },
+  { code: "skl-python", name: "Python" },
+  { code: "skl-sql", name: "SQL" },
+  { code: "skl-js", name: "JavaScript" },
+  { code: "skl-sales", name: "営業" },
 ];
 
-function getSkillGroupById(groupId) {
-  return SKILL_GROUPS.find((x) => x.id === groupId) ?? SKILL_GROUPS[0] ?? null;
-}
-
-function getSkillOptionsFlat() {
-  return SKILL_GROUPS.flatMap((x) => x.options || []);
-}
-
+/**
+ * @param {string} tab
+ * @returns {tab is SimpleTabKey}
+ */
 function isSimpleTab(tab) {
-  return !!SIMPLE_TAB_META[tab];
+  return tab === "station" || tab === "pref" || tab === "employment" || tab === "salary" || tab === "skill";
 }
 
+/** @param {SimpleTabKey} tab */
 function getSimpleOptions(tab) {
-  if (tab === "station") return getAllStationOptions();
+  if (tab === "station") return STATION_OPTIONS;
   if (tab === "pref") return PREF_OPTIONS;
   if (tab === "employment") return EMPLOYMENT_OPTIONS;
   if (tab === "salary") return SALARY_OPTIONS;
-  if (tab === "skill") return getSkillOptionsFlat();
+  if (tab === "skill") return SKILL_OPTIONS;
   return [];
 }
 
+/** @param {SimpleTabKey} tab */
 function getSimpleSelectedSet(tab) {
   if (tab === "station") return state.selectedStations;
   if (tab === "pref") return state.selectedPrefConditions;
@@ -450,95 +336,21 @@ function simpleOptRowHTML(opt, selectedSet) {
   `;
 }
 
-function skillOptRowHTML(opt, selectedSet) {
-  const checked = selectedSet?.has(opt.code) ? "checked" : "";
-  const countText = Number.isFinite(opt?.count) ? `(${opt.count}件)` : "";
-  return `
-    <label class="skillOptionItem">
-      <input type="checkbox" name="simpleOpt" value="${opt.code}" ${checked} />
-      <span class="skillOptionName">${opt.name}</span>
-      <span class="skillOptionCount">${countText}</span>
-    </label>
-  `;
-}
-
-function renderSkillTab() {
-  const selectedSet = getSimpleSelectedSet("skill");
-  const activeGroup = getSkillGroupById(state.selectedSkillGroup || "language") || SKILL_GROUPS[0];
-  if (activeGroup) state.selectedSkillGroup = activeGroup.id;
-
-  if (stationAreaWrapEl) stationAreaWrapEl.style.display = "none";
-  if (citySearchEl) {
-    citySearchEl.value = "";
-    citySearchEl.disabled = true;
-    citySearchEl.style.display = "none";
-  }
-  if (onlySelectedEl) {
-    onlySelectedEl.checked = false;
-    onlySelectedEl.disabled = true;
-  }
-  if (onlyWrapEl) onlyWrapEl.style.display = "none";
-
-  if (areaBarEl) {
-    areaBarEl.hidden = true;
-    if (areaBarHomeParentEl && areaBarEl.parentElement !== areaBarHomeParentEl) {
-      if (areaBarHomeNextSibling) areaBarHomeParentEl.insertBefore(areaBarEl, areaBarHomeNextSibling);
-      else areaBarHomeParentEl.appendChild(areaBarEl);
-    }
-  }
-  if (cityCountEl && cityCountHomeParentEl && cityCountEl.parentElement !== cityCountHomeParentEl) {
-    if (cityCountHomeNextSibling) cityCountHomeParentEl.insertBefore(cityCountEl, cityCountHomeNextSibling);
-    else cityCountHomeParentEl.appendChild(cityCountEl);
-  }
-
-  if (prefTitleEl) prefTitleEl.textContent = "言語・フレームワーク他";
-  if (cityCountEl) cityCountEl.textContent = `登録：${getSkillOptionsFlat().length}件`;
-  setAreaCount("");
-
-  cityListEl.innerHTML = `
-    <div class="skillPicker" aria-label="スキル選択">
-      <div class="skillPickerMenu">
-        ${SKILL_GROUPS.map((group) => {
-          const active = group.id === activeGroup?.id ? "active" : "";
-          return `<button type="button" class="skillMenuBtn ${active}" data-skill-group="${group.id}">${group.name}</button>`;
-        }).join("")}
-      </div>
-      <div class="skillPickerArrow" aria-hidden="true">≫</div>
-      <div class="skillPickerPanel">
-        <div class="skillOptionsGrid">
-          ${(activeGroup?.options || []).map((opt) => skillOptRowHTML(opt, selectedSet)).join("")}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function renderSimpleTab() {
   const tab = state.activeTab;
+  if (!isSimpleTab(tab)) return;
   const meta = SIMPLE_TAB_META[tab];
   const selectedSet = getSimpleSelectedSet(tab);
   const options = getSimpleOptions(tab);
 
   // workタブで移動/非表示にしたUIを戻す
-  // station は「都道府県選択→駅一覧（エリア選択）」に寄せる。
+  // station は「検索→エリア選択」に差し替え。
   // pref/employment/salary はツール類（検索/選択中のみ/エリア）を出さない
   const isStation = (tab === "station");
   const isSalary = (tab === "salary");
-  const isSkill = (tab === "skill");
   const hideAllTools = (tab === "employment" || tab === "pref" || tab === "salary");
 
-  if (isSkill) {
-    renderSkillTab();
-    updateSelectedCount();
-    updateSummary();
-    return;
-  }
-
-  // station は都道府県が未選択なら右側も未選択表示にする（勤務地と同じ感じ）
-  const checkedPrefCodes = isStation ? getCheckedPrefCodes() : [];
-  const hasAnyPrefForStation = isStation ? (checkedPrefCodes.length > 0) : false;
-
-  if (stationAreaWrapEl) stationAreaWrapEl.style.display = (isStation && !hideAllTools && hasAnyPrefForStation) ? "" : "none";
+  if (stationAreaWrapEl) stationAreaWrapEl.style.display = (isStation && !hideAllTools) ? "" : "none";
 
   if (citySearchEl) {
     if (hideAllTools || isStation) {
@@ -577,13 +389,7 @@ function renderSimpleTab() {
   // 見出し
   if (prefTitleEl) {
     if (tab === "salary") prefTitleEl.textContent = getSalaryGroupLabel(state.salaryActiveGroup);
-    else if (isStation) {
-      if (!hasAnyPrefForStation) prefTitleEl.textContent = "未選択";
-      else if (checkedPrefCodes.length === 1) prefTitleEl.textContent = PREFS[checkedPrefCodes[0]]?.name ?? "最寄り駅";
-      else prefTitleEl.textContent = `都道府県（${checkedPrefCodes.length}件）`;
-    } else {
-      prefTitleEl.textContent = meta?.title ?? "未選択";
-    }
+    else prefTitleEl.textContent = meta?.title ?? "未選択";
   }
   // 件数はフィルタ後の表示件数に合わせる（stationのエリア/ salaryのカテゴリ等）
   if (cityCountEl) cityCountEl.textContent = "";
@@ -593,25 +399,12 @@ function renderSimpleTab() {
   const q = (hideAllTools || isStation) ? "" : (citySearchEl?.value || "").trim();
   const onlySelected = (hideAllTools || isStation) ? false : !!onlySelectedEl?.checked;
 
-  // station：都道府県選択が無い場合は案内を表示して終了
-  if (isStation && !hasAnyPrefForStation) {
-    if (cityCountEl) cityCountEl.textContent = "";
-    setAreaCount("");
-    if (cityListEl) cityListEl.innerHTML = `<div class="empty">左で都道府県を選択すると、右に駅が表示されます</div>`;
-    updateSelectedCount();
-    updateSummary();
-    return;
-  }
-
-  let pool = options;
+  let visible = options;
   if (isStation) {
-    pool = pool.filter((x) => checkedPrefCodes.includes(x?.prefCode || ""));
     ensureStationAreaOptions();
     const a = state.selectedStationArea || "all";
-    if (a !== "all") pool = pool.filter((x) => (x?.area || "") === a);
+    if (a !== "all") visible = visible.filter((x) => (x?.area || "") === a);
   }
-
-  let visible = pool;
   if (isSalary) {
     const g = state.salaryActiveGroup || "yearly";
     visible = visible.filter((x) => (x?.group || "yearly") === g);
@@ -619,7 +412,7 @@ function renderSimpleTab() {
   if (q) visible = visible.filter((x) => (x?.name || "").includes(q));
   if (onlySelected && selectedSet) visible = visible.filter((x) => selectedSet.has(x.code));
 
-  if (cityCountEl) cityCountEl.textContent = `登録：${pool.length}件`;
+  if (cityCountEl) cityCountEl.textContent = `登録：${options.length}件`;
   setAreaCount(`表示：${visible.length}件`);
 
   const salaryRangeHTML = (() => {
@@ -821,7 +614,7 @@ function renderSimpleTab() {
       const minPick = Number.isFinite(minMan) ? String(Math.round(minMan)) : "";
       const maxPick = Number.isFinite(maxMan) ? String(Math.round(maxMan)) : "";
 
-      const fmt = (n) => (Number.isFinite(n) ? String(Math.round(n)).toLocaleString("ja-JP") : "");
+      const fmt = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString("ja-JP") : "");
 
       const rows = YEARLY_GAUGE_AMOUNTS_MAN.map((amountMan, idx) => {
         const n = idx + 1;
@@ -1040,27 +833,89 @@ function getPoolForPref(prefCode) {
   if (prefCode === "10") return [...GUNMA_ALL_CITIES];
   if (prefCode === "11") {
     const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
-    // 大宮/浦和/中央/見沼/桜は「区ボックス」で扱う（町名・丁目に拡張しやすくする）
+    // 大宮/北/浦和/中央/見沼/桜/南は「区ボックス」で扱う（町名・丁目に拡張しやすくする）
     const otherWardsRaw = wardsRaw.filter(
-      (c) => c?.code !== "11103" && c?.code !== "11104" && c?.code !== "11105" && c?.code !== "11106" && c?.code !== "11107"
+      (c) => c?.code !== "11102" && c?.code !== "11103" && c?.code !== "11104" && c?.code !== "11105" && c?.code !== "11106" && c?.code !== "11107" && c?.code !== "11108"
     );
+    const kitaWardRaw = wardsRaw.filter((c) => c?.code === "11102");
     const minumaWardRaw = wardsRaw.filter((c) => c?.code === "11104");
     const sakuraWardRaw = wardsRaw.filter((c) => c?.code === "11106");
+    const minamiWardRaw = wardsRaw.filter((c) => c?.code === "11108");
+    const kitaAreasRaw = (typeof SAITAMA_KITA_AREAS !== "undefined" && Array.isArray(SAITAMA_KITA_AREAS)) ? SAITAMA_KITA_AREAS : [];
     const omiyaAreasRaw = Array.isArray(SAITAMA_OMIYA_AREAS) ? SAITAMA_OMIYA_AREAS : [];
     const urawaAreasRaw = Array.isArray(SAITAMA_URAWA_AREAS) ? SAITAMA_URAWA_AREAS : [];
     const chuoAreasRaw = Array.isArray(SAITAMA_CHUO_AREAS) ? SAITAMA_CHUO_AREAS : [];
+    const minumaAreasRaw = (typeof SAITAMA_MINUMA_AREAS !== "undefined" && Array.isArray(SAITAMA_MINUMA_AREAS)) ? SAITAMA_MINUMA_AREAS : [];
+    const minumaPoolRaw = minumaAreasRaw.length ? minumaAreasRaw : minumaWardRaw;
+    const sakuraAreasRaw = (typeof SAITAMA_SAKURA_AREAS !== "undefined" && Array.isArray(SAITAMA_SAKURA_AREAS)) ? SAITAMA_SAKURA_AREAS : [];
+    const sakuraPoolRaw = sakuraAreasRaw.length ? sakuraAreasRaw : sakuraWardRaw;
+    const minamiAreasRaw = (typeof SAITAMA_MINAMI_AREAS !== "undefined" && Array.isArray(SAITAMA_MINAMI_AREAS)) ? SAITAMA_MINAMI_AREAS : [];
+    const minamiPoolRaw = minamiAreasRaw.length ? minamiAreasRaw : minamiWardRaw;
+    const kitaPoolRaw = kitaAreasRaw.length ? kitaAreasRaw : kitaWardRaw;
 
     const grouped = (typeof SAITAMA_GROUPED === "object" && SAITAMA_GROUPED) ? SAITAMA_GROUPED : {};
     const groupOrder = ["埼玉東部", "埼玉西武", "埼玉南部", "埼玉北部", "秩父地域"];
+    const wakoAreasRaw = (typeof SAITAMA_WAKO_AREAS !== "undefined" && Array.isArray(SAITAMA_WAKO_AREAS)) ? SAITAMA_WAKO_AREAS : [];
+    const yoshikawaAreasRaw = (typeof SAITAMA_YOSHIKAWA_AREAS !== "undefined" && Array.isArray(SAITAMA_YOSHIKAWA_AREAS)) ? SAITAMA_YOSHIKAWA_AREAS : [];
+    const kawaguchiAreasRaw = (typeof SAITAMA_KAWAGUCHI_AREAS !== "undefined" && Array.isArray(SAITAMA_KAWAGUCHI_AREAS)) ? SAITAMA_KAWAGUCHI_AREAS : [];
+    const kawagoeAreasRaw = (typeof SAITAMA_KAWAGOE_AREAS !== "undefined" && Array.isArray(SAITAMA_KAWAGOE_AREAS)) ? SAITAMA_KAWAGOE_AREAS : [];
+    const tokorozawaAreasRaw = (typeof SAITAMA_TOKOROZAWA_AREAS !== "undefined" && Array.isArray(SAITAMA_TOKOROZAWA_AREAS)) ? SAITAMA_TOKOROZAWA_AREAS : [];
+    const sayamaAreasRaw = (typeof SAITAMA_SAYAMA_AREAS !== "undefined" && Array.isArray(SAITAMA_SAYAMA_AREAS)) ? SAITAMA_SAYAMA_AREAS : [];
+    const hannoAreasRaw = (typeof SAITAMA_HANNO_AREAS !== "undefined" && Array.isArray(SAITAMA_HANNO_AREAS)) ? SAITAMA_HANNO_AREAS : [];
+    const hidakaAreasRaw = (typeof SAITAMA_HIDAKA_AREAS !== "undefined" && Array.isArray(SAITAMA_HIDAKA_AREAS)) ? SAITAMA_HIDAKA_AREAS : [];
+    const higashimatsuyamaAreasRaw = (typeof SAITAMA_HIGASHIMATSUYAMA_AREAS !== "undefined" && Array.isArray(SAITAMA_HIGASHIMATSUYAMA_AREAS)) ? SAITAMA_HIGASHIMATSUYAMA_AREAS : [];
     const others = [];
     for (const gName of groupOrder) {
-      const raw = Array.isArray(grouped[gName]) ? grouped[gName] : [];
+      const raw0 = Array.isArray(grouped[gName]) ? grouped[gName] : [];
+      let raw = raw0;
+      if (wakoAreasRaw.length) raw = raw.filter((c) => c?.code !== "11229");
+      if (kawaguchiAreasRaw.length) raw = raw.filter((c) => c?.code !== "11203");
+      if (kawagoeAreasRaw.length) raw = raw.filter((c) => c?.code !== "11201");
+      if (tokorozawaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11208");
+      if (sayamaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11215");
+      if (hannoAreasRaw.length) raw = raw.filter((c) => c?.code !== "11209");
+      if (hidakaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11242");
+      if (higashimatsuyamaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11212");
+      raw = raw.filter((c) => c?.code !== "11243");
       others.push(...raw);
     }
 
-    return [...otherWardsRaw, ...omiyaAreasRaw, ...urawaAreasRaw, ...chuoAreasRaw, ...minumaWardRaw, ...sakuraWardRaw, ...others];
+    const wakoCityRaw = [{ code: "11229", name: "和光市" }];
+    const wakoPoolRaw = wakoAreasRaw.length ? wakoAreasRaw : wakoCityRaw;
+
+    const yoshikawaCityRaw = [{ code: "11243", name: "吉川市" }];
+    const yoshikawaPoolRaw = yoshikawaAreasRaw.length ? yoshikawaAreasRaw : yoshikawaCityRaw;
+
+    const kawaguchiCityRaw = [{ code: "11203", name: "川口市" }];
+    const kawaguchiPoolRaw = kawaguchiAreasRaw.length ? kawaguchiAreasRaw : kawaguchiCityRaw;
+
+    const kawagoeCityRaw = [{ code: "11201", name: "川越市" }];
+    const kawagoePoolRaw = kawagoeAreasRaw.length ? kawagoeAreasRaw : kawagoeCityRaw;
+
+    const tokorozawaCityRaw = [{ code: "11208", name: "所沢市" }];
+    const tokorozawaPoolRaw = tokorozawaAreasRaw.length ? tokorozawaAreasRaw : tokorozawaCityRaw;
+
+    const sayamaCityRaw = [{ code: "11215", name: "狭山市" }];
+    const sayamaPoolRaw = sayamaAreasRaw.length ? sayamaAreasRaw : sayamaCityRaw;
+
+    const hannoCityRaw = [{ code: "11209", name: "飯能市" }];
+    const hannoPoolRaw = hannoAreasRaw.length ? hannoAreasRaw : hannoCityRaw;
+
+    const hidakaCityRaw = [{ code: "11242", name: "日高市" }];
+    const hidakaPoolRaw = hidakaAreasRaw.length ? hidakaAreasRaw : hidakaCityRaw;
+
+    const higashimatsuyamaCityRaw = [{ code: "11212", name: "東松山市" }];
+    const higashimatsuyamaPoolRaw = higashimatsuyamaAreasRaw.length ? higashimatsuyamaAreasRaw : higashimatsuyamaCityRaw;
+
+    return [...otherWardsRaw, ...kitaPoolRaw, ...omiyaAreasRaw, ...urawaAreasRaw, ...chuoAreasRaw, ...minumaPoolRaw, ...sakuraPoolRaw, ...minamiPoolRaw, ...wakoPoolRaw, ...kawaguchiPoolRaw, ...kawagoePoolRaw, ...tokorozawaPoolRaw, ...(sayamaAreasRaw.length ? sayamaPoolRaw : []), ...(hannoAreasRaw.length ? hannoPoolRaw : []), ...hidakaPoolRaw, ...higashimatsuyamaPoolRaw, ...yoshikawaPoolRaw, ...others];
   }
-  if (prefCode === "12") return [...CHIBA_ALL_CITIES];
+  if (prefCode === "12") {
+    const base = Object.values(CHIBA_GROUPED ?? {}).flat();
+    const nagareyama = (typeof CHIBA_NAGAREYAMA_AREAS !== "undefined" && Array.isArray(CHIBA_NAGAREYAMA_AREAS))
+      ? CHIBA_NAGAREYAMA_AREAS
+      : [];
+    return [...base, ...nagareyama];
+  }
   if (prefCode === "13") return [...TOKYO_ALL_CITIES];
   if (prefCode === "14") return [...KANAGAWA_ALL_CITIES];
   return [];
@@ -1070,48 +925,201 @@ function renderSaitama() {
   const blocks = [];
   const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
   const otherWardsRaw = wardsRaw.filter(
-    (c) => c?.code !== "11103" && c?.code !== "11104" && c?.code !== "11105" && c?.code !== "11106" && c?.code !== "11107"
+    (c) => c?.code !== "11102" && c?.code !== "11103" && c?.code !== "11104" && c?.code !== "11105" && c?.code !== "11106" && c?.code !== "11107" && c?.code !== "11108"
   );
+  const kitaWardRaw = wardsRaw.filter((c) => c?.code === "11102");
   const minumaWardRaw = wardsRaw.filter((c) => c?.code === "11104");
   const sakuraWardRaw = wardsRaw.filter((c) => c?.code === "11106");
+  const minamiWardRaw = wardsRaw.filter((c) => c?.code === "11108");
   const omiyaAreasRaw = Array.isArray(SAITAMA_OMIYA_AREAS) ? SAITAMA_OMIYA_AREAS : [];
+  const kitaAreasRaw = (typeof SAITAMA_KITA_AREAS !== "undefined" && Array.isArray(SAITAMA_KITA_AREAS)) ? SAITAMA_KITA_AREAS : [];
   const urawaAreasRaw = Array.isArray(SAITAMA_URAWA_AREAS) ? SAITAMA_URAWA_AREAS : [];
   const chuoAreasRaw = Array.isArray(SAITAMA_CHUO_AREAS) ? SAITAMA_CHUO_AREAS : [];
+  const minumaAreasRaw = (typeof SAITAMA_MINUMA_AREAS !== "undefined" && Array.isArray(SAITAMA_MINUMA_AREAS)) ? SAITAMA_MINUMA_AREAS : [];
+  const sakuraAreasRaw = (typeof SAITAMA_SAKURA_AREAS !== "undefined" && Array.isArray(SAITAMA_SAKURA_AREAS)) ? SAITAMA_SAKURA_AREAS : [];
+  const minamiAreasRaw = (typeof SAITAMA_MINAMI_AREAS !== "undefined" && Array.isArray(SAITAMA_MINAMI_AREAS)) ? SAITAMA_MINAMI_AREAS : [];
+  const kawaguchiAreasRaw = (typeof SAITAMA_KAWAGUCHI_AREAS !== "undefined" && Array.isArray(SAITAMA_KAWAGUCHI_AREAS)) ? SAITAMA_KAWAGUCHI_AREAS : [];
+  const kawagoeAreasRaw = (typeof SAITAMA_KAWAGOE_AREAS !== "undefined" && Array.isArray(SAITAMA_KAWAGOE_AREAS)) ? SAITAMA_KAWAGOE_AREAS : [];
+  const tokorozawaAreasRaw = (typeof SAITAMA_TOKOROZAWA_AREAS !== "undefined" && Array.isArray(SAITAMA_TOKOROZAWA_AREAS)) ? SAITAMA_TOKOROZAWA_AREAS : [];
+  const sayamaAreasRaw = (typeof SAITAMA_SAYAMA_AREAS !== "undefined" && Array.isArray(SAITAMA_SAYAMA_AREAS)) ? SAITAMA_SAYAMA_AREAS : [];
+  const hannoAreasRaw = (typeof SAITAMA_HANNO_AREAS !== "undefined" && Array.isArray(SAITAMA_HANNO_AREAS)) ? SAITAMA_HANNO_AREAS : [];
+  const hidakaAreasRaw = (typeof SAITAMA_HIDAKA_AREAS !== "undefined" && Array.isArray(SAITAMA_HIDAKA_AREAS)) ? SAITAMA_HIDAKA_AREAS : [];
+  const higashimatsuyamaAreasRaw = (typeof SAITAMA_HIGASHIMATSUYAMA_AREAS !== "undefined" && Array.isArray(SAITAMA_HIGASHIMATSUYAMA_AREAS)) ? SAITAMA_HIGASHIMATSUYAMA_AREAS : [];
+
+  // 旧仕様: 見沼区は code=11104 の単体チェックだった。
+  // 新仕様: 町名（11104-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (minumaAreasRaw.length && isCitySelected("11", "11104")) {
+    setCitySelected("11", "11104", false);
+  }
+
+  // 旧仕様: 北区は code=11102 の単体チェックだった。
+  // 新仕様: 町名（11102-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (kitaAreasRaw.length && isCitySelected("11", "11102")) {
+    setCitySelected("11", "11102", false);
+  }
+
+  // 旧仕様: 桜区は code=11106 の単体チェックだった。
+  // 新仕様: 町名（11106-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (sakuraAreasRaw.length && isCitySelected("11", "11106")) {
+    setCitySelected("11", "11106", false);
+  }
+
+  // 旧仕様: 南区は code=11108 の単体チェックだった。
+  // 新仕様: 町名（11108-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (minamiAreasRaw.length && isCitySelected("11", "11108")) {
+    setCitySelected("11", "11108", false);
+  }
+
+  const minumaPoolRaw = minumaAreasRaw.length ? minumaAreasRaw : minumaWardRaw;
+  const sakuraPoolRaw = sakuraAreasRaw.length ? sakuraAreasRaw : sakuraWardRaw;
+  const minamiPoolRaw = minamiAreasRaw.length ? minamiAreasRaw : minamiWardRaw;
+  const kitaPoolRaw = kitaAreasRaw.length ? kitaAreasRaw : kitaWardRaw;
   const grouped = (typeof SAITAMA_GROUPED === "object" && SAITAMA_GROUPED) ? SAITAMA_GROUPED : {};
   const groupOrder = ["埼玉東部", "埼玉西武", "埼玉南部", "埼玉北部", "秩父地域"];
 
+  const wakoAreasRaw = (typeof SAITAMA_WAKO_AREAS !== "undefined" && Array.isArray(SAITAMA_WAKO_AREAS)) ? SAITAMA_WAKO_AREAS : [];
+  const wakoCityRaw = [{ code: "11229", name: "和光市" }];
+
+  const yoshikawaAreasRaw = (typeof SAITAMA_YOSHIKAWA_AREAS !== "undefined" && Array.isArray(SAITAMA_YOSHIKAWA_AREAS)) ? SAITAMA_YOSHIKAWA_AREAS : [];
+  const yoshikawaCityRaw = [{ code: "11243", name: "吉川市" }];
+
+  const kawaguchiCityRaw = [{ code: "11203", name: "川口市" }];
+  const kawagoeCityRaw = [{ code: "11201", name: "川越市" }];
+  const higashimatsuyamaCityRaw = [{ code: "11212", name: "東松山市" }];
+
+  // 旧仕様: 和光市は code=11229 の単体チェックだった。
+  // 新仕様: 町名（11229-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (wakoAreasRaw.length && isCitySelected("11", "11229")) {
+    setCitySelected("11", "11229", false);
+  }
+
+  // 旧仕様: 吉川市は code=11243 の単体チェックだった。
+  // 新仕様: 町名（11243-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (yoshikawaAreasRaw.length && isCitySelected("11", "11243")) {
+    setCitySelected("11", "11243", false);
+  }
+
+  // 旧仕様: 川口市は code=11203 の単体チェックだった。
+  // 新仕様: 町名（11203-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (kawaguchiAreasRaw.length && isCitySelected("11", "11203")) {
+    setCitySelected("11", "11203", false);
+  }
+
+  // 旧仕様: 川越市は code=11201 の単体チェックだった。
+  // 新仕様: 町名（11201-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (kawagoeAreasRaw.length && isCitySelected("11", "11201")) {
+    setCitySelected("11", "11201", false);
+  }
+
+  // 旧仕様: 所沢市は code=11208 の単体チェックだった。
+  // 新仕様: 町名（11208-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (tokorozawaAreasRaw.length && isCitySelected("11", "11208")) {
+    setCitySelected("11", "11208", false);
+  }
+
+  // 旧仕様: 狭山市は code=11215 の単体チェックだった。
+  // 新仕様: 町名（11215-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (sayamaAreasRaw.length && isCitySelected("11", "11215")) {
+    setCitySelected("11", "11215", false);
+  }
+
+  // 旧仕様: 飯能市は code=11209 の単体チェックだった。
+  // 新仕様: 町名（11209-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (hannoAreasRaw.length && isCitySelected("11", "11209")) {
+    setCitySelected("11", "11209", false);
+  }
+
+  // 旧仕様: 日高市は code=11242 の単体チェックだった。
+  // 新仕様: 町名（11242-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (hidakaAreasRaw.length && isCitySelected("11", "11242")) {
+    setCitySelected("11", "11242", false);
+  }
+
+  // 旧仕様: 東松山市は code=11212 の単体チェックだった。
+  // 新仕様: 町名（11212-...）に置き換えるため、町名リストがある場合は旧選択を自動で外す。
+  if (higashimatsuyamaAreasRaw.length && isCitySelected("11", "11212")) {
+    setCitySelected("11", "11212", false);
+  }
+
+  const wakoPoolRaw = wakoAreasRaw.length ? wakoAreasRaw : wakoCityRaw;
+  const yoshikawaPoolRaw = yoshikawaAreasRaw.length ? yoshikawaAreasRaw : yoshikawaCityRaw;
+  const kawaguchiPoolRaw = kawaguchiAreasRaw.length ? kawaguchiAreasRaw : kawaguchiCityRaw;
+  const kawagoePoolRaw = kawagoeAreasRaw.length ? kawagoeAreasRaw : kawagoeCityRaw;
+  const tokorozawaCityRaw = [{ code: "11208", name: "所沢市" }];
+  const tokorozawaPoolRaw = tokorozawaAreasRaw.length ? tokorozawaAreasRaw : tokorozawaCityRaw;
+  const sayamaCityRaw = [{ code: "11215", name: "狭山市" }];
+  const sayamaPoolRaw = sayamaAreasRaw.length ? sayamaAreasRaw : sayamaCityRaw;
+  const hannoCityRaw = [{ code: "11209", name: "飯能市" }];
+  const hannoPoolRaw = hannoAreasRaw.length ? hannoAreasRaw : hannoCityRaw;
+  const hidakaCityRaw = [{ code: "11242", name: "日高市" }];
+  const hidakaPoolRaw = hidakaAreasRaw.length ? hidakaAreasRaw : hidakaCityRaw;
+  const higashimatsuyamaPoolRaw = higashimatsuyamaAreasRaw.length ? higashimatsuyamaAreasRaw : higashimatsuyamaCityRaw;
+
   const areaKey = state.selectedArea || "all";
-  const isWardArea = (areaKey === "大宮区" || areaKey === "浦和区" || areaKey === "中央区" || areaKey === "見沼区" || areaKey === "桜区");
+  const isWardArea = (areaKey === "北区" || areaKey === "大宮区" || areaKey === "浦和区" || areaKey === "中央区" || areaKey === "見沼区" || areaKey === "桜区" || areaKey === "南区");
   const showSaitamaCity = (areaKey === "all");
+  const showKita = (areaKey === "all" || areaKey === "北区");
   const showOmiya = (areaKey === "all" || areaKey === "大宮区");
   const showUrawa = (areaKey === "all" || areaKey === "浦和区");
   const showChuo = (areaKey === "all" || areaKey === "中央区");
   const showMinuma = (areaKey === "all" || areaKey === "見沼区");
   const showSakura = (areaKey === "all" || areaKey === "桜区");
+  const showMinami = (areaKey === "all" || areaKey === "南区");
+  const showWako = (areaKey === "all" || areaKey === "埼玉南部");
+  const showKawaguchi = (areaKey === "all" || areaKey === "埼玉南部");
+  const showKawagoe = (areaKey === "all" || areaKey === "埼玉西武");
+  const showTokorozawa = (areaKey === "all" || areaKey === "埼玉西武");
+  const showSayama = (areaKey === "all" || areaKey === "埼玉西武");
+  const showHanno = (areaKey === "all" || areaKey === "埼玉西武");
+  const showHidaka = (areaKey === "all" || areaKey === "埼玉西武");
+  const showHigashimatsuyama = (areaKey === "all" || areaKey === "埼玉北部");
+  const showYoshikawa = (areaKey === "all" || areaKey === "埼玉東部");
 
   const otherWardsVisible = showSaitamaCity ? applyFilters(otherWardsRaw) : [];
+  const kitaVisible = showKita ? applyFilters(kitaPoolRaw) : [];
   const omiyaAreasVisible = showOmiya ? applyFilters(omiyaAreasRaw) : [];
   const urawaAreasVisible = showUrawa ? applyFilters(urawaAreasRaw) : [];
   const chuoAreasVisible = showChuo ? applyFilters(chuoAreasRaw) : [];
-  const minumaWardVisible = showMinuma ? applyFilters(minumaWardRaw) : [];
-  const sakuraWardVisible = showSakura ? applyFilters(sakuraWardRaw) : [];
+  const minumaVisible = showMinuma ? sortByJobCountDesc("11", applyFilters(minumaPoolRaw)) : [];
+  const sakuraVisible = showSakura ? applyFilters(sakuraPoolRaw) : [];
+  const minamiVisible = showMinami ? applyFilters(minamiPoolRaw) : [];
+  const wakoVisible = showWako ? applyFilters(wakoPoolRaw) : [];
+  const kawaguchiVisible = showKawaguchi ? applyFilters(kawaguchiPoolRaw) : [];
+  const kawagoeVisible = showKawagoe ? applyFilters(kawagoePoolRaw) : [];
+  const tokorozawaVisible = showTokorozawa ? applyFilters(tokorozawaPoolRaw) : [];
+  const sayamaVisible = (showSayama && sayamaAreasRaw.length) ? applyFilters(sayamaPoolRaw) : [];
+  const hannoVisible = (showHanno && hannoAreasRaw.length) ? applyFilters(hannoPoolRaw) : [];
+  const hidakaVisible = showHidaka ? applyFilters(hidakaPoolRaw) : [];
+  const higashimatsuyamaVisible = showHigashimatsuyama ? applyFilters(higashimatsuyamaPoolRaw) : [];
+  const yoshikawaVisible = showYoshikawa ? applyFilters(yoshikawaPoolRaw) : [];
 
   const targetGroups = (areaKey === "all") ? groupOrder : isWardArea ? [] : groupOrder.filter((x) => x === areaKey);
 
   let visibleTotal = 0;
   visibleTotal += otherWardsVisible.length;
+  visibleTotal += kitaVisible.length;
   visibleTotal += omiyaAreasVisible.length;
   visibleTotal += urawaAreasVisible.length;
   visibleTotal += chuoAreasVisible.length;
-  visibleTotal += minumaWardVisible.length;
-  visibleTotal += sakuraWardVisible.length;
+  visibleTotal += minumaVisible.length;
+  visibleTotal += sakuraVisible.length;
+  visibleTotal += minamiVisible.length;
+  visibleTotal += wakoVisible.length;
+  visibleTotal += kawaguchiVisible.length;
+  visibleTotal += kawagoeVisible.length;
+  visibleTotal += tokorozawaVisible.length;
+  visibleTotal += sayamaVisible.length;
+  visibleTotal += hannoVisible.length;
+  visibleTotal += hidakaVisible.length;
+  visibleTotal += higashimatsuyamaVisible.length;
+  visibleTotal += yoshikawaVisible.length;
 
   // さいたま市：区（大宮区は町丁目で別枠にする）
   if (showSaitamaCity) {
-    const saitamaCityPoolRaw = [...otherWardsRaw, ...omiyaAreasRaw, ...urawaAreasRaw, ...chuoAreasRaw, ...minumaWardRaw, ...sakuraWardRaw];
+    const saitamaCityPoolRaw = [...otherWardsRaw, ...kitaPoolRaw, ...omiyaAreasRaw, ...urawaAreasRaw, ...chuoAreasRaw, ...minumaPoolRaw, ...sakuraPoolRaw, ...minamiPoolRaw];
     const wardsAllSelected = saitamaCityPoolRaw.length > 0 && saitamaCityPoolRaw.every((c) => isCitySelected("11", c.code));
     const wardsAllChecked = wardsAllSelected ? "checked" : "";
-    const saitamaVisibleCount = otherWardsVisible.length + omiyaAreasVisible.length + urawaAreasVisible.length + chuoAreasVisible.length + minumaWardVisible.length + sakuraWardVisible.length;
+    const saitamaVisibleCount = otherWardsVisible.length + kitaVisible.length + omiyaAreasVisible.length + urawaAreasVisible.length + chuoAreasVisible.length + minumaVisible.length + sakuraVisible.length + minamiVisible.length;
 
     blocks.push(
       `<div class="cityBox">` +
@@ -1124,6 +1132,26 @@ function renderSaitama() {
         `</div>` +
         `<div class="cityGroupGrid cityGroupGrid--3col">` +
           otherWardsVisible.map(cityRowHTML).join("") +
+        `</div>` +
+      `</div>`
+    );
+  }
+
+  // 北区：町名（独立）
+  if (kitaVisible.length) {
+    const kitaAllSelected = kitaPoolRaw.length > 0 && kitaPoolRaw.every((c) => isCitySelected("11", c.code));
+    const kitaAllChecked = kitaAllSelected ? "checked" : "";
+    blocks.push(
+      `<div class="cityBox">` +
+        `<div class="cityBoxHead">` +
+          `<label class="cityBoxPick">` +
+            `<input class="kitaAreaSelectAll" type="checkbox" ${kitaAllChecked} />` +
+            `<span>北区</span>` +
+          `</label>` +
+          `<span class="badge">${kitaVisible.length}件</span>` +
+        `</div>` +
+        `<div class="cityGroupGrid cityGroupGrid--3col">` +
+          kitaVisible.map(cityRowHTML).join("") +
         `</div>` +
       `</div>`
     );
@@ -1190,8 +1218,8 @@ function renderSaitama() {
   }
 
   // 見沼区：区（現状は区単体。町名リストが来たら置き換え）
-  if (minumaWardVisible.length) {
-    const minumaAllSelected = minumaWardRaw.length > 0 && minumaWardRaw.every((c) => isCitySelected("11", c.code));
+  if (minumaVisible.length) {
+    const minumaAllSelected = minumaPoolRaw.length > 0 && minumaPoolRaw.every((c) => isCitySelected("11", c.code));
     const minumaAllChecked = minumaAllSelected ? "checked" : "";
     blocks.push(
       `<div class="cityBox">` +
@@ -1200,18 +1228,18 @@ function renderSaitama() {
             `<input class="minumaAreaSelectAll" type="checkbox" ${minumaAllChecked} />` +
             `<span>見沼区</span>` +
           `</label>` +
-          `<span class="badge">${minumaWardVisible.length}件</span>` +
+          `<span class="badge">${minumaVisible.length}件</span>` +
         `</div>` +
-        `<div class="cityGroupGrid cityGroupGrid--3col">` +
-          minumaWardVisible.map(cityRowHTML).join("") +
+        `<div class="cityGroupGrid cityGroupGrid--2col">` +
+          minumaVisible.map(cityRowHTML).join("") +
         `</div>` +
       `</div>`
     );
   }
 
   // 桜区：区（現状は区単体。町名リストが来たら置き換え）
-  if (sakuraWardVisible.length) {
-    const sakuraAllSelected = sakuraWardRaw.length > 0 && sakuraWardRaw.every((c) => isCitySelected("11", c.code));
+  if (sakuraVisible.length) {
+    const sakuraAllSelected = sakuraPoolRaw.length > 0 && sakuraPoolRaw.every((c) => isCitySelected("11", c.code));
     const sakuraAllChecked = sakuraAllSelected ? "checked" : "";
     blocks.push(
       `<div class="cityBox">` +
@@ -1220,10 +1248,80 @@ function renderSaitama() {
             `<input class="sakuraAreaSelectAll" type="checkbox" ${sakuraAllChecked} />` +
             `<span>桜区</span>` +
           `</label>` +
-          `<span class="badge">${sakuraWardVisible.length}件</span>` +
+          `<span class="badge">${sakuraVisible.length}件</span>` +
         `</div>` +
         `<div class="cityGroupGrid cityGroupGrid--3col">` +
-          sakuraWardVisible.map(cityRowHTML).join("") +
+          sakuraVisible.map(cityRowHTML).join("") +
+        `</div>` +
+      `</div>`
+    );
+  }
+
+  // 南区：町名
+  // 要件：桜区の下に独立表示
+  if (minamiVisible.length) {
+    const minamiAllSelected = minamiPoolRaw.length > 0 && minamiPoolRaw.every((c) => isCitySelected("11", c.code));
+    const minamiAllChecked = minamiAllSelected ? "checked" : "";
+    blocks.push(
+      `<div class="cityBox">` +
+        `<div class="cityBoxHead">` +
+          `<label class="cityBoxPick">` +
+            `<input class="minamiAreaSelectAll" type="checkbox" ${minamiAllChecked} />` +
+            `<span>南区</span>` +
+          `</label>` +
+          `<span class="badge">${minamiVisible.length}件</span>` +
+        `</div>` +
+        `<div class="cityGroupGrid cityGroupGrid--3col">` +
+          minamiVisible.map(cityRowHTML).join("") +
+        `</div>` +
+      `</div>`
+    );
+  }
+
+  // 和光市：町名（独立）
+  if (wakoVisible.length) {
+    const wakoAllSelected = wakoPoolRaw.length > 0 && wakoPoolRaw.every((c) => isCitySelected("11", c.code));
+    const wakoAllChecked = wakoAllSelected ? "checked" : "";
+    blocks.push(
+      `<div class="cityBox">` +
+        `<div class="cityBoxHead">` +
+          `<label class="cityBoxPick">` +
+            `<input class="wakoAreaSelectAll" type="checkbox" ${wakoAllChecked} />` +
+            `<span>和光市</span>` +
+          `</label>` +
+          `<span class="badge">${wakoVisible.length}件</span>` +
+        `</div>` +
+        `<div class="cityGroupGrid cityGroupGrid--3col">` +
+          wakoVisible.map(cityRowHTML).join("") +
+        `</div>` +
+      `</div>`
+    );
+  }
+
+  // 川口市：町名（埼玉南部の下で独立表示）
+  // ※実際の挿入位置は「埼玉南部」セクション直下（下のループ内）
+
+  // 川越市：町名（埼玉西武の下で独立表示）
+  // ※実際の挿入位置は「埼玉西武」セクション直下（下のループ内）
+
+  // 東松山市：町名（埼玉北部の下で独立表示）
+  // ※実際の挿入位置は「埼玉北部」セクション直下（下のループ内）
+
+  // 吉川市：町名（独立）
+  if (yoshikawaVisible.length) {
+    const yoshikawaAllSelected = yoshikawaPoolRaw.length > 0 && yoshikawaPoolRaw.every((c) => isCitySelected("11", c.code));
+    const yoshikawaAllChecked = yoshikawaAllSelected ? "checked" : "";
+    blocks.push(
+      `<div class="cityBox">` +
+        `<div class="cityBoxHead">` +
+          `<label class="cityBoxPick">` +
+            `<input class="yoshikawaAreaSelectAll" type="checkbox" ${yoshikawaAllChecked} />` +
+            `<span>吉川市</span>` +
+          `</label>` +
+          `<span class="badge">${yoshikawaVisible.length}件</span>` +
+        `</div>` +
+        `<div class="cityGroupGrid cityGroupGrid--3col">` +
+          yoshikawaVisible.map(cityRowHTML).join("") +
         `</div>` +
       `</div>`
     );
@@ -1231,19 +1329,174 @@ function renderSaitama() {
 
   // さいたま市以外：指定の5区分で表示（エリア選択に応じて絞り込み）
   for (const gName of targetGroups) {
-    const raw = Array.isArray(grouped[gName]) ? grouped[gName] : [];
+    const raw0 = Array.isArray(grouped[gName]) ? grouped[gName] : [];
+    let raw = raw0;
+    if (wakoAreasRaw.length) raw = raw.filter((c) => c?.code !== "11229");
+    if (kawaguchiAreasRaw.length) raw = raw.filter((c) => c?.code !== "11203");
+    if (kawagoeAreasRaw.length) raw = raw.filter((c) => c?.code !== "11201");
+    if (tokorozawaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11208");
+    if (sayamaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11215");
+    if (hannoAreasRaw.length) raw = raw.filter((c) => c?.code !== "11209");
+    if (hidakaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11242");
+    if (higashimatsuyamaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11212");
+    raw = raw.filter((c) => c?.code !== "11243");
     if (raw.length === 0) continue;
     const visible = applyFilters(raw);
-    if (visible.length === 0) continue;
+    const areaExtra = ((gName === "埼玉南部") ? kawaguchiVisible.length : 0) + ((gName === "埼玉西武") ? (kawagoeVisible.length + tokorozawaVisible.length + sayamaVisible.length + hannoVisible.length + hidakaVisible.length) : 0) + ((gName === "埼玉北部") ? higashimatsuyamaVisible.length : 0);
+    if (visible.length + areaExtra === 0) continue;
 
     visibleTotal += visible.length;
 
     blocks.push(
       `<div class="sectionTitleRow">` +
         `<span class="areaHeaderTitle">${gName}</span>` +
-        `<span class="badge">${visible.length}件</span>` +
+        `<span class="badge">${visible.length + areaExtra}件</span>` +
       `</div>`
     );
+
+    // 埼玉南部：川口市をセクション直下に独立表示
+    if (gName === "埼玉南部" && kawaguchiVisible.length) {
+      const kawaguchiAllSelected = kawaguchiPoolRaw.length > 0 && kawaguchiPoolRaw.every((c) => isCitySelected("11", c.code));
+      const kawaguchiAllChecked = kawaguchiAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="kawaguchiAreaSelectAll" type="checkbox" ${kawaguchiAllChecked} />` +
+              `<span>川口市</span>` +
+            `</label>` +
+            `<span class="badge">${kawaguchiVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            kawaguchiVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
+
+    // 埼玉西武：川越市をセクション直下に独立表示
+    if (gName === "埼玉西武" && kawagoeVisible.length) {
+      const kawagoeAllSelected = kawagoePoolRaw.length > 0 && kawagoePoolRaw.every((c) => isCitySelected("11", c.code));
+      const kawagoeAllChecked = kawagoeAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="kawagoeAreaSelectAll" type="checkbox" ${kawagoeAllChecked} />` +
+              `<span>川越市</span>` +
+            `</label>` +
+            `<span class="badge">${kawagoeVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            kawagoeVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
+
+    // 埼玉西武：所沢市をセクション直下に独立表示
+    if (gName === "埼玉西武" && tokorozawaVisible.length) {
+      const tokorozawaAllSelected = tokorozawaPoolRaw.length > 0 && tokorozawaPoolRaw.every((c) => isCitySelected("11", c.code));
+      const tokorozawaAllChecked = tokorozawaAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="tokorozawaAreaSelectAll" type="checkbox" ${tokorozawaAllChecked} />` +
+              `<span>所沢市</span>` +
+            `</label>` +
+            `<span class="badge">${tokorozawaVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            tokorozawaVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
+
+    // 埼玉西武：狭山市をセクション直下に独立表示
+    // ※町名リストがある場合のみ（未投入時の二重表示を防ぐ）
+    if (gName === "埼玉西武" && sayamaVisible.length) {
+      const sayamaAllSelected = sayamaPoolRaw.length > 0 && sayamaPoolRaw.every((c) => isCitySelected("11", c.code));
+      const sayamaAllChecked = sayamaAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="sayamaAreaSelectAll" type="checkbox" ${sayamaAllChecked} />` +
+              `<span>狭山市</span>` +
+            `</label>` +
+            `<span class="badge">${sayamaVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            sayamaVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
+
+    // 埼玉西武：飯能市をセクション直下に独立表示
+    // ※町名リストがある場合のみ（未投入時の二重表示を防ぐ）
+    if (gName === "埼玉西武" && hannoVisible.length) {
+      const hannoAllSelected = hannoPoolRaw.length > 0 && hannoPoolRaw.every((c) => isCitySelected("11", c.code));
+      const hannoAllChecked = hannoAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="hannoAreaSelectAll" type="checkbox" ${hannoAllChecked} />` +
+              `<span>飯能市</span>` +
+            `</label>` +
+            `<span class="badge">${hannoVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            hannoVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
+
+    // 埼玉西武：日高市をセクション直下に独立表示
+    if (gName === "埼玉西武" && hidakaVisible.length) {
+      const hidakaAllSelected = hidakaPoolRaw.length > 0 && hidakaPoolRaw.every((c) => isCitySelected("11", c.code));
+      const hidakaAllChecked = hidakaAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="hidakaAreaSelectAll" type="checkbox" ${hidakaAllChecked} />` +
+              `<span>日高市</span>` +
+            `</label>` +
+            `<span class="badge">${hidakaVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            hidakaVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
+
+    // 埼玉北部：東松山市をセクション直下に独立表示
+    if (gName === "埼玉北部" && higashimatsuyamaVisible.length) {
+      const higashimatsuyamaAllSelected = higashimatsuyamaPoolRaw.length > 0 && higashimatsuyamaPoolRaw.every((c) => isCitySelected("11", c.code));
+      const higashimatsuyamaAllChecked = higashimatsuyamaAllSelected ? "checked" : "";
+      blocks.push(
+        `<div class="cityBox">` +
+          `<div class="cityBoxHead">` +
+            `<label class="cityBoxPick">` +
+              `<input class="higashimatsuyamaAreaSelectAll" type="checkbox" ${higashimatsuyamaAllChecked} />` +
+              `<span>東松山市</span>` +
+            `</label>` +
+            `<span class="badge">${higashimatsuyamaVisible.length}件</span>` +
+          `</div>` +
+          `<div class="cityGroupGrid cityGroupGrid--3col">` +
+            higashimatsuyamaVisible.map(cityRowHTML).join("") +
+          `</div>` +
+        `</div>`
+      );
+    }
+
+    if (visible.length === 0) continue;
     blocks.push(
       `<div class="cityGroupGrid cityGroupGrid--3col">` +
         visible.map(cityRowHTML).join("") +
@@ -1256,13 +1509,34 @@ function renderSaitama() {
   if (cityCountEl) {
     const registered = new Set();
     for (const c of otherWardsRaw) registered.add(c.code);
+    for (const c of kitaPoolRaw) registered.add(c.code);
     for (const c of omiyaAreasRaw) registered.add(c.code);
     for (const c of urawaAreasRaw) registered.add(c.code);
     for (const c of chuoAreasRaw) registered.add(c.code);
-    for (const c of minumaWardRaw) registered.add(c.code);
-    for (const c of sakuraWardRaw) registered.add(c.code);
+    for (const c of minumaPoolRaw) registered.add(c.code);
+    for (const c of sakuraPoolRaw) registered.add(c.code);
+    for (const c of minamiPoolRaw) registered.add(c.code);
+    for (const c of wakoPoolRaw) registered.add(c.code);
+    for (const c of kawaguchiPoolRaw) registered.add(c.code);
+    for (const c of kawagoePoolRaw) registered.add(c.code);
+    for (const c of tokorozawaPoolRaw) registered.add(c.code);
+    if (sayamaAreasRaw.length) for (const c of sayamaPoolRaw) registered.add(c.code);
+    if (hannoAreasRaw.length) for (const c of hannoPoolRaw) registered.add(c.code);
+    for (const c of hidakaPoolRaw) registered.add(c.code);
+    for (const c of higashimatsuyamaPoolRaw) registered.add(c.code);
+    for (const c of yoshikawaPoolRaw) registered.add(c.code);
     for (const gName of groupOrder) {
-      const raw = Array.isArray(grouped[gName]) ? grouped[gName] : [];
+      const raw0 = Array.isArray(grouped[gName]) ? grouped[gName] : [];
+      let raw = raw0;
+      if (wakoAreasRaw.length) raw = raw.filter((c) => c?.code !== "11229");
+      if (kawaguchiAreasRaw.length) raw = raw.filter((c) => c?.code !== "11203");
+      if (kawagoeAreasRaw.length) raw = raw.filter((c) => c?.code !== "11201");
+      if (tokorozawaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11208");
+      if (sayamaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11215");
+      if (hannoAreasRaw.length) raw = raw.filter((c) => c?.code !== "11209");
+      if (hidakaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11242");
+      if (higashimatsuyamaAreasRaw.length) raw = raw.filter((c) => c?.code !== "11212");
+      raw = raw.filter((c) => c?.code !== "11243");
       for (const c of raw) registered.add(c.code);
     }
     cityCountEl.textContent = `登録：${registered.size}件`;
@@ -1335,19 +1609,6 @@ const AREA_OPTIONS_BY_PREF = {
     { value: "県南東部", label: "県南東部" },
     { value: "鹿行", label: "鹿行" },
   ],
-  "12": [
-    { value: "all", label: "すべて" },
-    { value: "東葛飾地域", label: "東葛飾地域" },
-    { value: "葛南地域", label: "葛南地域" },
-    { value: "印旛地域", label: "印旛地域" },
-    { value: "香取地域", label: "香取地域" },
-    { value: "海匝地域", label: "海匝地域" },
-    { value: "山武地域", label: "山武地域" },
-    { value: "長生地域", label: "長生地域" },
-    { value: "夷隅地域", label: "夷隅地域" },
-    { value: "安房地域", label: "安房地域" },
-    { value: "君津地域", label: "君津地域" },
-  ],
   "14": [
     { value: "all", label: "すべて" },
     { value: "横浜地域", label: "横浜地域" },
@@ -1372,16 +1633,31 @@ const AREA_OPTIONS_BY_PREF = {
   ],
   "11": [
     { value: "all", label: "すべて" },
+    { value: "北区", label: "さいたま市 北区" },
     { value: "大宮区", label: "さいたま市 大宮区" },
     { value: "浦和区", label: "さいたま市 浦和区" },
     { value: "中央区", label: "さいたま市 中央区" },
     { value: "見沼区", label: "さいたま市 見沼区" },
     { value: "桜区", label: "さいたま市 桜区" },
+    { value: "南区", label: "さいたま市 南区" },
     { value: "埼玉東部", label: "埼玉東部" },
     { value: "埼玉西武", label: "埼玉西武" },
     { value: "埼玉南部", label: "埼玉南部" },
     { value: "埼玉北部", label: "埼玉北部" },
     { value: "秩父地域", label: "秩父地域" },
+  ],
+  "12": [
+    { value: "all", label: "すべて" },
+    { value: "東葛飾地域", label: "東葛飾地域" },
+    { value: "葛南地域", label: "葛南地域" },
+    { value: "印旛地域", label: "印旛地域" },
+    { value: "香取地域", label: "香取地域" },
+    { value: "海匝地域", label: "海匝地域" },
+    { value: "山武地域", label: "山武地域" },
+    { value: "長生地域", label: "長生地域" },
+    { value: "夷隅地域", label: "夷隅地域" },
+    { value: "安房地域", label: "安房地域" },
+    { value: "君津地域", label: "君津地域" },
   ],
   "13": [
     { value: "all", label: "すべて" },
@@ -1413,325 +1689,6 @@ const AREA_OPTIONS_BY_PREF = {
     { value: "昭島市", label: "昭島市" },
   ],
 };
-
-function renderChiba() {
-  const blocks = [];
-  let visibleTotal = 0;
-
-  const areaKey = state.selectedArea || "all";
-
-  const allCitiesRaw = CHIBA_ALL_CITIES;
-
-  // 「すべて」表示時のみ、最上段に「千葉県（全選択）」を出す
-  if (areaKey === "all") {
-    const listAllVisible = applyFilters(allCitiesRaw);
-    const prefAllSelected = allCitiesRaw.length > 0 && allCitiesRaw.every((c) => isCitySelected("12", c.code));
-    const prefAllChecked = prefAllSelected ? "checked" : "";
-    blocks.push(
-      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-        `<span class="areaHeaderLeft">` +
-          `<label class="areaPick">` +
-            `<input class="chibaPrefSelectAll" type="checkbox" ${prefAllChecked} />` +
-          `</label>` +
-        `</span>` +
-        `<span class="areaHeaderTitle">千葉県</span>` +
-        `<span class="badge">${listAllVisible.length}件</span>` +
-      `</div>`
-    );
-  }
-
-  const groupOrder = [
-    "東葛飾地域",
-    "葛南地域",
-    "印旛地域",
-    "香取地域",
-    "海匝地域",
-    "山武地域",
-    "長生地域",
-    "夷隅地域",
-    "安房地域",
-    "君津地域",
-  ];
-
-  for (const gName of groupOrder) {
-    if (areaKey !== "all" && areaKey !== gName) continue;
-
-    const raw = (typeof CHIBA_GROUPED === "object" && CHIBA_GROUPED) ? (CHIBA_GROUPED[gName] ?? []) : [];
-    const visible = applyFilters(raw);
-
-    // 地域（全選択）の対象プール：東葛飾は松戸/柏/流山地名、葛南は市川/船橋/八千代/浦安/習志野の地名も含める
-    const pool = (gName === "東葛飾地域")
-      ? [
-        ...raw,
-        ...(Array.isArray(CHIBA_MATSUDO_AREAS) ? CHIBA_MATSUDO_AREAS : []),
-        ...(Array.isArray(CHIBA_KASHIWA_AREAS) ? CHIBA_KASHIWA_AREAS : []),
-        ...(Array.isArray(CHIBA_NAGAREYAMA_AREAS) ? CHIBA_NAGAREYAMA_AREAS : []),
-      ]
-      : (gName === "葛南地域")
-        ? [
-          ...raw,
-          ...(Array.isArray(CHIBA_ICHIKAWA_AREAS) ? CHIBA_ICHIKAWA_AREAS : []),
-          ...(Array.isArray(CHIBA_FUNABASHI_AREAS) ? CHIBA_FUNABASHI_AREAS : []),
-          ...(Array.isArray(CHIBA_YACHIYO_AREAS) ? CHIBA_YACHIYO_AREAS : []),
-          ...(Array.isArray(CHIBA_URAYASU_AREAS) ? CHIBA_URAYASU_AREAS : []),
-          ...(Array.isArray(CHIBA_NARASHINO_AREAS) ? CHIBA_NARASHINO_AREAS : []),
-        ]
-        : [...raw];
-
-    if (visible.length > 0) {
-      visibleTotal += visible.length;
-
-      const allSelected = pool.length > 0 && pool.every((c) => isCitySelected("12", c.code));
-      const allChecked = allSelected ? "checked" : "";
-
-      blocks.push(
-        `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-          `<span class="areaHeaderLeft">` +
-            `<label class="areaPick">` +
-              `<input class="chibaAreaSelectAll" data-area="${gName}" type="checkbox" ${allChecked} />` +
-            `</label>` +
-          `</span>` +
-          `<span class="areaHeaderTitle">${gName}</span>` +
-          `<span class="badge">${visible.length}件</span>` +
-        `</div>`
-      );
-
-      blocks.push(
-        `<div class="cityGroupGrid cityGroupGrid--3col">` +
-          visible.map(cityRowHTML).join("") +
-        `</div>`
-      );
-    }
-
-    // 松戸市：独立セクション（地名）
-    if (gName === "東葛飾地域") {
-      const matsudoRaw = Array.isArray(CHIBA_MATSUDO_AREAS) ? CHIBA_MATSUDO_AREAS : [];
-      const matsudoVisible = applyFilters(matsudoRaw);
-      if (matsudoVisible.length > 0) {
-        visibleTotal += matsudoVisible.length;
-        const matsudoAllSelected = matsudoRaw.length > 0 && matsudoRaw.every((c) => isCitySelected("12", c.code));
-        const matsudoAllChecked = matsudoAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaMatsudoSelectAll" type="checkbox" ${matsudoAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">松戸市</span>` +
-            `<span class="badge">${matsudoVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--2col">` +
-            matsudoVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-    }
-
-    // 柏市：独立セクション（地名）
-    if (gName === "東葛飾地域") {
-      const kashiwaRaw = Array.isArray(CHIBA_KASHIWA_AREAS) ? CHIBA_KASHIWA_AREAS : [];
-      const kashiwaVisible = applyFilters(kashiwaRaw);
-      if (kashiwaVisible.length > 0) {
-        visibleTotal += kashiwaVisible.length;
-        const kashiwaAllSelected = kashiwaRaw.length > 0 && kashiwaRaw.every((c) => isCitySelected("12", c.code));
-        const kashiwaAllChecked = kashiwaAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaKashiwaSelectAll" type="checkbox" ${kashiwaAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">柏市</span>` +
-            `<span class="badge">${kashiwaVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--3col">` +
-            kashiwaVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-    }
-
-    // 流山市：独立セクション（地名）
-    if (gName === "東葛飾地域") {
-      const nagareyamaRaw = Array.isArray(CHIBA_NAGAREYAMA_AREAS) ? CHIBA_NAGAREYAMA_AREAS : [];
-      const nagareyamaVisible = applyFilters(nagareyamaRaw);
-      if (nagareyamaVisible.length > 0) {
-        visibleTotal += nagareyamaVisible.length;
-        const nagareyamaAllSelected = nagareyamaRaw.length > 0 && nagareyamaRaw.every((c) => isCitySelected("12", c.code));
-        const nagareyamaAllChecked = nagareyamaAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaNagareyamaSelectAll" type="checkbox" ${nagareyamaAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">流山市</span>` +
-            `<span class="badge">${nagareyamaVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--3col">` +
-            nagareyamaVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-    }
-
-    // 葛南地域：独立セクション（地名）
-    if (gName === "葛南地域") {
-      // 市川市：独立セクション（地名）
-      const ichikawaRaw = Array.isArray(CHIBA_ICHIKAWA_AREAS) ? CHIBA_ICHIKAWA_AREAS : [];
-      const ichikawaVisible = applyFilters(ichikawaRaw);
-      if (ichikawaVisible.length > 0) {
-        visibleTotal += ichikawaVisible.length;
-        const ichikawaAllSelected = ichikawaRaw.length > 0 && ichikawaRaw.every((c) => isCitySelected("12", c.code));
-        const ichikawaAllChecked = ichikawaAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaIchikawaSelectAll" type="checkbox" ${ichikawaAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">市川市</span>` +
-            `<span class="badge">${ichikawaVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--3col">` +
-            ichikawaVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-
-      // 船橋市：独立セクション（地名）
-      const funabashiRaw = Array.isArray(CHIBA_FUNABASHI_AREAS) ? CHIBA_FUNABASHI_AREAS : [];
-      const funabashiVisible = applyFilters(funabashiRaw);
-      if (funabashiVisible.length > 0) {
-        visibleTotal += funabashiVisible.length;
-        const funabashiAllSelected = funabashiRaw.length > 0 && funabashiRaw.every((c) => isCitySelected("12", c.code));
-        const funabashiAllChecked = funabashiAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaFunabashiSelectAll" type="checkbox" ${funabashiAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">船橋市</span>` +
-            `<span class="badge">${funabashiVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--3col">` +
-            funabashiVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-
-      // 八千代市：独立セクション（地名）
-      const yachiyoRaw = Array.isArray(CHIBA_YACHIYO_AREAS) ? CHIBA_YACHIYO_AREAS : [];
-      const yachiyoVisible = applyFilters(yachiyoRaw);
-      if (yachiyoVisible.length > 0) {
-        visibleTotal += yachiyoVisible.length;
-        const yachiyoAllSelected = yachiyoRaw.length > 0 && yachiyoRaw.every((c) => isCitySelected("12", c.code));
-        const yachiyoAllChecked = yachiyoAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaYachiyoSelectAll" type="checkbox" ${yachiyoAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">八千代市</span>` +
-            `<span class="badge">${yachiyoVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--3col">` +
-            yachiyoVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-
-      // 習志野市：独立セクション（地名）
-      const narashinoRaw = Array.isArray(CHIBA_NARASHINO_AREAS) ? CHIBA_NARASHINO_AREAS : [];
-      const narashinoVisible = applyFilters(narashinoRaw);
-      if (narashinoVisible.length > 0) {
-        visibleTotal += narashinoVisible.length;
-        const narashinoAllSelected = narashinoRaw.length > 0 && narashinoRaw.every((c) => isCitySelected("12", c.code));
-        const narashinoAllChecked = narashinoAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaNarashinoSelectAll" type="checkbox" ${narashinoAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">習志野市</span>` +
-            `<span class="badge">${narashinoVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--3col">` +
-            narashinoVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-
-      const urayasuRaw = Array.isArray(CHIBA_URAYASU_AREAS) ? CHIBA_URAYASU_AREAS : [];
-      const urayasuVisible = applyFilters(urayasuRaw);
-      if (urayasuVisible.length > 0) {
-        visibleTotal += urayasuVisible.length;
-        const urayasuAllSelected = urayasuRaw.length > 0 && urayasuRaw.every((c) => isCitySelected("12", c.code));
-        const urayasuAllChecked = urayasuAllSelected ? "checked" : "";
-
-        blocks.push(
-          `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-            `<span class="areaHeaderLeft">` +
-              `<label class="areaPick">` +
-                `<input class="chibaUrayasuSelectAll" type="checkbox" ${urayasuAllChecked} />` +
-              `</label>` +
-            `</span>` +
-            `<span class="areaHeaderTitle">浦安市</span>` +
-            `<span class="badge">${urayasuVisible.length}件</span>` +
-          `</div>`
-        );
-
-        blocks.push(
-          `<div class="cityGroupGrid cityGroupGrid--3col">` +
-            urayasuVisible.map(cityRowHTML).join("") +
-          `</div>`
-        );
-      }
-    }
-  }
-
-  cityListEl.innerHTML = blocks.length ? blocks.join("") : `<div class="empty">該当なし</div>`;
-  cityCountEl.textContent = `登録：${allCitiesRaw.length}件`;
-  setAreaCount(`表示：${visibleTotal}件`);
-}
 
 function renderKanagawa() {
   function kanagawaAreaDisplayName(areaName) {
@@ -3248,22 +3205,6 @@ function getJobCountForJob(categoryId, jobCode) {
   return base + (h % spread);
 }
 
-function jobCountBadgeHTML(categoryId, jobCode) {
-  const n = getJobCountForJob(categoryId, jobCode);
-  return `<span class="countBadge">${n}件</span>`;
-}
-
-function jobRowHTML(categoryId, job) {
-  const checked = isJobSelected(categoryId, job.code) ? "checked" : "";
-  return `
-    <label class="cityItem">
-      <input type="checkbox" name="job" value="${job.code}" data-job-cat="${categoryId}" ${checked} />
-      <span class="cityName">${job.name}</span>
-      ${jobCountBadgeHTML(categoryId, job.code)}
-    </label>
-  `;
-}
-
 function renderJobLeft() {
   const container = document.getElementById("regionContainer");
   if (!container) return;
@@ -3334,9 +3275,22 @@ function getJobCount(prefCode, cityCode) {
   return base + (h % spread);
 }
 
+function sortByJobCountDesc(prefCode, list) {
+  const out = Array.isArray(list) ? [...list] : [];
+  out.sort((a, b) => {
+    const ac = getJobCount(prefCode, a?.code);
+    const bc = getJobCount(prefCode, b?.code);
+    if (bc !== ac) return bc - ac;
+    const an = String(a?.name ?? "");
+    const bn = String(b?.name ?? "");
+    return an.localeCompare(bn, "ja");
+  });
+  return out;
+}
+
 function countBadgeHTML(prefCode, cityCode) {
   const n = getJobCount(prefCode, cityCode);
-  return `<span class="countBadge">${n}</span>`;
+  return `<span class="countBadge">${n}件</span>`;
 }
 
 function normalizeRubyLabel(nameHtml) {
@@ -3345,33 +3299,12 @@ function normalizeRubyLabel(nameHtml) {
   if (value.includes("<ruby")) return value;
 
   // 例：南足柄市（<rb>みなみあしがらし</rb>） → <ruby><rb>南足柄市</rb><rt>みなみあしがらし</rt></ruby>
-  // <RB> のような大文字混在も許容する
   const m = value.match(/^(.+?)（\s*<rb>([\s\S]*?)<\/rb>\s*）$/i);
   if (!m) return value;
 
   const base = (m[1] || "").trim();
-  let reading = (m[2] || "").trim();
+  const reading = (m[2] || "").trim();
   if (!base || !reading) return value;
-
-  // ルビが「漢字のまま」になっている場合、読み辞書でひらがなに上書きする
-  // 例：東（<RB>東</RB>） → 東（<rt>あずま</rt>）
-  if (base === reading) {
-    const map = (typeof CHIBA_KASHIWA_RUBY_MAP === "object" && CHIBA_KASHIWA_RUBY_MAP) ? CHIBA_KASHIWA_RUBY_MAP : null;
-    if (map) {
-      const candidates = [
-        base,
-        base.replace(/ヶ/g, "ケ"),
-        base.replace(/ケ/g, "ヶ"),
-      ];
-      for (const key of candidates) {
-        const v = map[key];
-        if (typeof v === "string" && v.trim()) {
-          reading = v.trim();
-          break;
-        }
-      }
-    }
-  }
   return `<ruby><rb>${base}</rb><rt>${reading}</rt></ruby>`;
 }
 
@@ -3383,6 +3316,18 @@ function cityRowHTML(c) {
       <input type="checkbox" name="city" value="${c.code}" ${checked} />
       <span class="cityName">${label}</span>
       ${countBadgeHTML(state.selectedPrefCode, c.code)}
+    </label>
+  `;
+}
+
+function cityRowHTMLNoCount(c, extraClass = "") {
+  const checked = isCitySelected(state.selectedPrefCode, c.code) ? "checked" : "";
+  const label = normalizeRubyLabel(c.name);
+  const cls = ["cityItem", extraClass].filter(Boolean).join(" ");
+  return `
+    <label class="${cls}">
+      <input type="checkbox" name="city" value="${c.code}" ${checked} />
+      <span class="cityName">${label}</span>
     </label>
   `;
 }
@@ -3610,19 +3555,17 @@ function renderHokkaido() {
 function renderAomori() {
   const blocks = [];
 
-  // ✅まず「津軽/南部/下北」を出す（その中で“青森市の街(例)”を先頭に置く）
-  const prefCode = state.selectedPrefCode;
-  const q = citySearchEl.value.trim();
-  const onlySelected = onlySelectedEl.checked;
+  const areaValue = state.selectedArea || "all";
+  const q = (citySearchEl?.value ?? "").trim();
+  const onlySelected = !!onlySelectedEl?.checked;
 
   const apply = (list) => {
     let out = list;
-    if (q) out = out.filter(c => c.name.includes(q));
-    if (onlySelected && prefCode) out = out.filter(c => isCitySelected(prefCode, c.code));
+    if (q) out = out.filter((c) => c.name.includes(q));
+    if (onlySelected) out = out.filter((c) => isCitySelected("02", c.code));
     return out;
   };
 
-  const areaValue = state.selectedArea || "all";
   const valueToAreaName = { tsugaru: "津軽", nanbu: "南部", shimokita: "下北" };
   const onlyAreaName = valueToAreaName[areaValue] || null;
   const showAomoriCity = (areaValue === "all" || areaValue === "aomori_city");
@@ -3655,35 +3598,36 @@ function renderAomori() {
     );
   }
 
-  const areaOrder = ["津軽","南部","下北"];
+  const areaOrder = ["津軽", "南部", "下北"];
   if (showOtherAreas) {
     for (const areaName of areaOrder) {
       if (onlyAreaName && areaName !== onlyAreaName) continue;
-      const districts = AOMORI_GROUPED[areaName];
+      const districts = AOMORI_GROUPED[areaName] ?? {};
 
-    const areaAll = Object.values(districts ?? {}).flat();
-    const areaAllSelected = areaAll.length > 0 && areaAll.every((c) => isCitySelected("02", c.code));
-    const areaAllChecked = areaAllSelected ? "checked" : "";
+      const areaAll = Object.values(districts).flat();
+      const areaAllSelected = areaAll.length > 0 && areaAll.every((c) => isCitySelected("02", c.code));
+      const areaAllChecked = areaAllSelected ? "checked" : "";
 
-    // area内合計
-    let areaCount = 0;
-    for (const dName of Object.keys(districts)) areaCount += apply(districts[dName]).length;
-    if (areaCount === 0) continue;
-    visibleTotal += areaCount;
+      // area内合計
+      let areaCount = 0;
+      for (const dName of Object.keys(districts)) areaCount += apply(districts[dName] ?? []).length;
+      if (areaCount === 0) continue;
+      visibleTotal += areaCount;
 
-    blocks.push(
-      `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
-        `<span class="areaHeaderLeft">` +
-          `<label class="areaPick">` +
-            `<input class="aomoriAreaSelectAll" type="checkbox" data-area="${areaName}" ${areaAllChecked} />` +
-          `</label>` +
-        `</span>` +
-        `<span class="areaHeaderTitle">${areaName}</span>` +
-        `<span class="badge">${areaCount}件</span>` +
-      `</div>`
-    );
+      blocks.push(
+        `<div class="sectionTitleRow sectionTitleRow--miyagi">` +
+          `<span class="areaHeaderLeft">` +
+            `<label class="areaPick">` +
+              `<input class="aomoriAreaSelectAll" type="checkbox" data-area="${areaName}" ${areaAllChecked} />` +
+            `</label>` +
+          `</span>` +
+          `<span class="areaHeaderTitle">${areaName}</span>` +
+          `<span class="badge">${areaCount}件</span>` +
+        `</div>`
+      );
+
       for (const districtName of Object.keys(districts)) {
-        const list = apply(districts[districtName]);
+        const list = apply(districts[districtName] ?? []);
         if (list.length === 0) continue;
         blocks.push(`<div class="subTitle">${districtName}<span class="badge">${list.length}件</span></div>`);
         blocks.push(...list.map(cityRowHTML));
@@ -3720,7 +3664,7 @@ function renderAomori() {
   // 件数（登録）
   const flatCount =
     AOMORI_AOMORI_CITY_AREAS.length +
-    Object.values(AOMORI_GROUPED).flatMap(x => Object.values(x)).flat().length;
+    Object.values(AOMORI_GROUPED).flatMap((x) => Object.values(x)).flat().length;
   cityCountEl.textContent = `登録：${flatCount}件`;
 }
 
@@ -3874,6 +3818,89 @@ function renderMiyagi() {
   cityListEl.innerHTML = blocks.length ? blocks.join("") : `<div class="empty">該当なし</div>`;
   const flatCount = Object.values(MIYAGI_GROUPED).flat().length;
   cityCountEl.textContent = `登録：${flatCount}件`;
+  setAreaCount(`表示：${visibleTotal}件`);
+}
+
+function renderChiba() {
+  const blocks = [];
+  let visibleTotal = 0;
+
+  const areaKey = state.selectedArea || "all";
+  const areaOrder = [
+    "東葛飾地域",
+    "葛南地域",
+    "印旛地域",
+    "香取地域",
+    "海匝地域",
+    "山武地域",
+    "長生地域",
+    "夷隅地域",
+    "安房地域",
+    "君津地域",
+  ];
+  const chosenAreas = (areaKey === "all") ? areaOrder : [areaKey];
+
+  const allCitiesRaw = getPoolForPref("12");
+
+  // 「すべて」表示時のみ、最上段に「千葉県（全選択）」を出す
+  if (areaKey === "all") {
+    const listAllVisible = applyFilters(allCitiesRaw);
+    const allSelectedPref = allCitiesRaw.length > 0 && allCitiesRaw.every((c) => isCitySelected("12", c.code));
+    const allCheckedPref = allSelectedPref ? "checked" : "";
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--chiba">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="chibaPrefSelectAll" type="checkbox" ${allCheckedPref} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">千葉県</span>` +
+        `<span class="areaHeaderRight">` +
+          `<span class="badge">${listAllVisible.length}件</span>` +
+        `</span>` +
+      `</div>`
+    );
+  }
+
+  for (const areaName of chosenAreas) {
+    const citiesAll = CHIBA_GROUPED?.[areaName] ?? [];
+
+    const nagareyamaRaw = (areaName === "東葛飾地域" && typeof CHIBA_NAGAREYAMA_AREAS !== "undefined" && Array.isArray(CHIBA_NAGAREYAMA_AREAS))
+      ? CHIBA_NAGAREYAMA_AREAS
+      : [];
+
+    const citiesVisible = applyFilters(citiesAll);
+    const nagareyamaVisible = applyFilters(nagareyamaRaw);
+    const listCount = citiesVisible.length + nagareyamaVisible.length;
+    visibleTotal += listCount;
+
+    const poolAll = [...citiesAll, ...nagareyamaRaw];
+    const allSelected = poolAll.length > 0 && poolAll.every((c) => isCitySelected("12", c.code));
+    const allChecked = allSelected ? "checked" : "";
+
+    blocks.push(
+      `<div class="sectionTitleRow sectionTitleRow--chiba">` +
+        `<span class="areaHeaderLeft">` +
+          `<label class="areaPick">` +
+            `<input class="areaSelectAll" type="checkbox" data-area="${areaName}" ${allChecked} />` +
+          `</label>` +
+        `</span>` +
+        `<span class="areaHeaderTitle">${areaName}</span>` +
+        `<span class="areaHeaderRight">` +
+          `<span class="badge">${list.length}件</span>` +
+        `</span>` +
+      `</div>`
+    );
+
+    if (list.length === 0) {
+      blocks.push(`<div class="empty">該当なし</div>`);
+      continue;
+    }
+    blocks.push(...list.map(cityRowHTML));
+  }
+
+  cityListEl.innerHTML = blocks.length ? blocks.join("") : `<div class="empty">該当なし</div>`;
+  cityCountEl.textContent = `登録：${allCitiesRaw.length}件`;
   setAreaCount(`表示：${visibleTotal}件`);
 }
 
@@ -4201,17 +4228,39 @@ function renderGunma() {
           `</span>` +
           `<span class="areaHeaderTitle">${gName}</span>` +
           `<span class="badge">${visible.length}件</span>` +
-        `</div>`
+            `<span class="badge">${listCount}件</span>` +
       );
 
       // 地方区分も「市区町村行は常に3列固定」にする
       blocks.push(
-        `<div class="cityGroupGrid cityGroupGrid--3col">` +
+      if (listCount === 0) {
           visible.map(cityRowHTML).join("") +
         `</div>`
       );
-    }
-  }
+
+      // 流山市：独立セクション（左チェック・右件数）
+      if (nagareyamaRaw.length > 0) {
+        const nagareyamaAllSelected = nagareyamaRaw.length > 0 && nagareyamaRaw.every((c) => isCitySelected("12", c.code));
+        const nagareyamaAllChecked = nagareyamaAllSelected ? "checked" : "";
+        blocks.push(
+          `<div class="sectionTitleRow sectionTitleRow--chiba">` +
+            `<span class="areaHeaderLeft">` +
+              `<label class="areaPick">` +
+                `<input class="chibaNagareyamaSelectAll" type="checkbox" ${nagareyamaAllChecked} />` +
+              `</label>` +
+            `</span>` +
+            `<span class="areaHeaderTitle">流山市</span>` +
+            `<span class="areaHeaderRight">` +
+              `<span class="badge">${nagareyamaVisible.length}件</span>` +
+            `</span>` +
+          `</div>`
+        );
+
+        if (nagareyamaVisible.length === 0) blocks.push(`<div class="empty">該当なし</div>`);
+        else blocks.push(...nagareyamaVisible.map(cityRowHTML));
+      }
+
+      blocks.push(...citiesVisible.map(cityRowHTML));
 
   cityListEl.innerHTML = blocks.length ? blocks.join("") : `<div class="empty">該当なし</div>`;
   cityCountEl.textContent = `登録：${allCitiesRaw.length}件`;
@@ -4716,7 +4765,41 @@ function buildJobSelectionLines() {
   return lines;
 }
 
+/**
+ * @template T
+ * @param {string} storageKey
+ * @returns {T|null}
+ */
+function tryLoadJsonFromStorage(storageKey) {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return /** @type {T} */ (parsed);
+  } catch {
+    return null;
+  }
+}
+
+/** @returns {WorkLocationSelectionPayload|null} */
+function loadWorkLocationSelectionFromStorage() {
+  return tryLoadJsonFromStorage("job:work_location_selection");
+}
+
+/** @returns {JobSelectionPayload|null} */
+function loadJobSelectionFromStorage() {
+  return tryLoadJsonFromStorage("job:job_selection");
+}
+
+/** @param {SimpleTabKey} tab */
+function loadSimpleSelectionFromStorage(tab) {
+  const meta = SIMPLE_TAB_META[tab];
+  return meta?.storageKey ? tryLoadJsonFromStorage(meta.storageKey) : null;
+}
+
 function persistSelectionForEntry() {
+  /** @type {WorkLocationSelectionPayload} */
   const payload = {
     savedAt: new Date().toISOString(),
     summary: selectedSummaryEl?.textContent ?? "",
@@ -4732,6 +4815,7 @@ function persistSelectionForEntry() {
 }
 
 function persistJobSelectionForEntry() {
+  /** @type {JobSelectionPayload} */
   const payload = {
     savedAt: new Date().toISOString(),
     summary: selectedSummaryEl?.textContent ?? "",
@@ -4746,6 +4830,7 @@ function persistJobSelectionForEntry() {
   }
 }
 
+/** @param {SimpleTabKey} tab */
 function buildSimpleSelectionLines(tab) {
   const options = getSimpleOptions(tab);
   const selectedSet = getSimpleSelectedSet(tab);
@@ -4808,10 +4893,12 @@ function buildSalarySelectionLines() {
   return lines;
 }
 
+/** @param {SimpleTabKey} tab */
 function persistSimpleSelectionForEntry(tab) {
   const meta = SIMPLE_TAB_META[tab];
   if (!meta?.storageKey) return;
 
+  /** @type {SimpleSelectionPayload} */
   const payload = {
     savedAt: new Date().toISOString(),
     summary: selectedSummaryEl?.textContent ?? "",
@@ -4848,7 +4935,7 @@ function renderCities() {
   const prefName = PREFS[prefCode]?.name ?? "未選択";
   // 埼玉県：地図へのリンクを付与（ユーザー要件）
   if (prefCode === "11") {
-    prefTitleEl.innerHTML = `<a class="prefTitleLink" href="/assets/saitama_map.html" target="_blank" rel="noopener">${prefName}</a>`;
+    prefTitleEl.innerHTML = `<button class="prefTitleLink" type="button" data-open-saitama-map="1">${prefName}</button>`;
   } else {
     prefTitleEl.textContent = prefName;
   }
@@ -4915,21 +5002,36 @@ function renderCities() {
     return;
   }
 
-  if (prefCode === "01") renderHokkaido();
-  else if (prefCode === "02") renderAomori();
-  else if (prefCode === "03") renderIwate();
-  else if (prefCode === "04") renderMiyagi();
-  else if (prefCode === "05") renderAkita();
-  else if (prefCode === "06") renderYamagata();
-  else if (prefCode === "07") renderFukushima();
-  else if (prefCode === "08") renderIbaraki();
-  else if (prefCode === "09") renderTochigi();
-  else if (prefCode === "10") renderGunma();
-  else if (prefCode === "11") renderSaitama();
-  else if (prefCode === "12") renderChiba();
-  else if (prefCode === "13") renderTokyo();
-  else if (prefCode === "14") renderKanagawa();
-  else renderNormalPref(prefCode);
+  try {
+    if (prefCode === "01") renderHokkaido();
+    else if (prefCode === "02") renderAomori();
+    else if (prefCode === "03") renderIwate();
+    else if (prefCode === "04") renderMiyagi();
+    else if (prefCode === "05") renderAkita();
+    else if (prefCode === "06") renderYamagata();
+    else if (prefCode === "07") renderFukushima();
+    else if (prefCode === "08") renderIbaraki();
+    else if (prefCode === "09") renderTochigi();
+    else if (prefCode === "10") renderGunma();
+    else if (prefCode === "11") renderSaitama();
+    else if (prefCode === "12") renderChiba();
+    else if (prefCode === "13") renderTokyo();
+    else if (prefCode === "14") renderKanagawa();
+    else renderNormalPref(prefCode);
+  } catch (e) {
+    // 20秒待っても表示が変わらない等の切り分け用：原因をUI/コンソール双方に出す
+    console.error("[renderCities] failed", { prefCode, activeTab: state.activeTab, error: e });
+    const msg = (e && (e.stack || e.message)) ? String(e.stack || e.message) : String(e);
+    cityListEl.innerHTML = `
+      <div class="empty">
+        描画中にエラーが発生しました。<br/>
+        コンソール（F12）で詳細を確認できます。<br/>
+        <pre style="white-space:pre-wrap; word-break:break-word; font-size:12px; margin-top:8px;">${escapeHTML(msg)}</pre>
+      </div>
+    `;
+    if (cityCountEl) cityCountEl.textContent = "";
+    setAreaCount("");
+  }
 }
 
 function setActiveTab(tab) {
@@ -4942,19 +5044,15 @@ function setActiveTab(tab) {
   if (found) found.classList.add("active");
 
   if (modalEl) modalEl.classList.toggle("jobMode", next === "job");
-  // station は勤務地と同じ2ペイン（左：都道府県）に寄せるため、simpleMode で左を畳まない
-  const collapseLeftForSimple = isSimpleTab(next) && next !== "station";
-  if (modalEl) modalEl.classList.toggle("simpleMode", collapseLeftForSimple);
-  if (modalEl) modalEl.classList.toggle("stationMode", next === "station");
+  if (modalEl) modalEl.classList.toggle("simpleMode", isSimpleTab(next));
   if (modalEl) modalEl.classList.toggle("salaryMode", next === "salary");
 
   if (leftTitleEl) {
     if (next === "job") leftTitleEl.textContent = "職種を選ぶ";
-    else if (next === "station") leftTitleEl.textContent = "都道府県選択";
     else if (isSimpleTab(next)) leftTitleEl.textContent = SIMPLE_TAB_META[next]?.title ?? "条件を選ぶ";
     else leftTitleEl.textContent = "都道府県選択";
   }
-  if (leftHelpEl) leftHelpEl.style.display = (next === "work" || next === "station") ? "block" : "none";
+  if (leftHelpEl) leftHelpEl.style.display = (next === "work") ? "block" : "none";
 
   // こだわり条件タブから「悪」を押す導線は削除（要件）
   const badBtn = document.getElementById("badPrefBtn");
@@ -4983,9 +5081,6 @@ function setActiveTab(tab) {
     renderJobLeft();
   } else if (next === "work") {
     renderLeftAccordion();
-  } else if (next === "station") {
-    // station は左に都道府県を出す（勤務地と同じ感じ）
-    renderLeftAccordion();
   } else if (next === "salary") {
     renderSalaryLeft();
   } else {
@@ -5011,10 +5106,10 @@ function setActiveTab(tab) {
 
 // ====== Events ======
 document.addEventListener("click", (e) => {
-  const t = e.target;
+  const t = /** @type {Element|null} */ (e.target);
 
   // tabs
-  const tabBtn = t.closest?.(".tabs .tab");
+  const tabBtn = t?.closest?.(".tabs .tab");
   if (tabBtn instanceof HTMLButtonElement) {
     const tab = tabBtn.getAttribute("data-tab") || "work";
     const next = (tab === "work" || tab === "job" || isSimpleTab(tab)) ? tab : "work";
@@ -5023,7 +5118,7 @@ document.addEventListener("click", (e) => {
   }
 
   // job category
-  const catBtn = t.closest?.(".jobCatBtn");
+  const catBtn = t?.closest?.(".jobCatBtn");
   if (catBtn instanceof HTMLButtonElement) {
     const salaryGroup = catBtn.getAttribute("data-salary-group") || "";
     if (salaryGroup) {
@@ -5041,17 +5136,8 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  const skillGroupBtn = t.closest?.(".skillMenuBtn");
-  if (skillGroupBtn instanceof HTMLButtonElement) {
-    if (state.activeTab !== "skill") return;
-    state.selectedSkillGroup = skillGroupBtn.getAttribute("data-skill-group") || "language";
-    renderCities();
-    updateSummary();
-    return;
-  }
-
   // salary（時給）：最低/最大時給のプリセット選択（入口ページ6番へ転記）
-  const pickBtn = t.closest?.("button[data-salary-pick][data-salary-value]");
+  const pickBtn = t?.closest?.("button[data-salary-pick][data-salary-value]");
   if (pickBtn instanceof HTMLButtonElement) {
     if (state.activeTab !== "salary") return;
     if ((state.salaryActiveGroup || "yearly") !== "hourly") return;
@@ -5070,11 +5156,12 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  const head = t.closest?.(".regionHead");
+  const head = t?.closest?.(".regionHead");
   if (head) {
-    if (state.activeTab !== "work" && state.activeTab !== "station") return;
+    if (state.activeTab !== "work") return;
     const idx = head.getAttribute("data-index");
-    const body = document.querySelector(`.regionBody[data-index="${idx}"]`);
+    const body = /** @type {HTMLElement|null} */ (document.querySelector(`.regionBody[data-index="${idx}"]`));
+    if (!body) return;
     const chev = head.querySelector(".chev");
     const isHidden = body.style.display === "none";
     body.style.display = isHidden ? "block" : "none";
@@ -5183,7 +5270,7 @@ document.addEventListener("change", (e) => {
 
     // 入力欄も表示更新するため再描画
     persistSimpleSelectionForEntry("salary");
-    renderSimpleTab("salary");
+    renderSimpleTab();
     return;
   }
 
@@ -5232,10 +5319,113 @@ document.addEventListener("change", (e) => {
 
   // 宮城：エリア枠の「全選択」チェックボックス
   if (t instanceof HTMLInputElement && t.matches("input.areaSelectAll")) {
-    if (state.selectedPrefCode !== "04") return;
+    const pref = state.selectedPrefCode;
+    if (pref !== "04" && pref !== "12") return;
+
     const areaName = t.getAttribute("data-area") || "";
-    const citiesAll = MIYAGI_GROUPED[areaName] ?? [];
-    for (const c of citiesAll) setCitySelected("04", c.code, t.checked);
+    const checked = t.checked;
+
+    const grouped = (pref === "04") ? MIYAGI_GROUPED : (CHIBA_GROUPED ?? {});
+    let citiesAll = grouped[areaName] ?? [];
+    if (pref === "12" && areaName === "東葛飾地域" && typeof CHIBA_NAGAREYAMA_AREAS !== "undefined" && Array.isArray(CHIBA_NAGAREYAMA_AREAS)) {
+      citiesAll = [...citiesAll, ...CHIBA_NAGAREYAMA_AREAS];
+    }
+    for (const c of citiesAll) setCitySelected(pref, c.code, checked);
+    updateSummary();
+    renderCities();
+    return;
+  }
+
+  // 千葉：エリア枠の「全選択」チェックボックス
+  if (t instanceof HTMLInputElement && t.matches("input.chibaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "12") return;
+    const areaName = t.getAttribute("data-area") || "";
+    const chuoAreasRaw = (typeof CHIBA_CHUO_AREAS !== "undefined" && Array.isArray(CHIBA_CHUO_AREAS)) ? CHIBA_CHUO_AREAS : [];
+    const mihamaAreasRaw = (typeof CHIBA_MIHAMA_AREAS !== "undefined" && Array.isArray(CHIBA_MIHAMA_AREAS)) ? CHIBA_MIHAMA_AREAS : [];
+    const hanamigawaAreasRaw = (typeof CHIBA_HANAMIGAWA_AREAS !== "undefined" && Array.isArray(CHIBA_HANAMIGAWA_AREAS)) ? CHIBA_HANAMIGAWA_AREAS : [];
+    const inageAreasRaw = (typeof CHIBA_INAGE_AREAS !== "undefined" && Array.isArray(CHIBA_INAGE_AREAS)) ? CHIBA_INAGE_AREAS : [];
+    const wakabaAreasRaw = (typeof CHIBA_WAKABA_AREAS !== "undefined" && Array.isArray(CHIBA_WAKABA_AREAS)) ? CHIBA_WAKABA_AREAS : [];
+    const midoriAreasRaw = (typeof CHIBA_MIDORI_AREAS !== "undefined" && Array.isArray(CHIBA_MIDORI_AREAS)) ? CHIBA_MIDORI_AREAS : [];
+    const base = CHIBA_GROUPED?.[areaName] ?? [];
+    const citiesAll = (!Array.isArray(base) || base.length === 0)
+      ? []
+      : (areaName === "千葉北西部" && (chuoAreasRaw.length || mihamaAreasRaw.length || hanamigawaAreasRaw.length || inageAreasRaw.length || wakabaAreasRaw.length || midoriAreasRaw.length))
+        ? [
+          ...base
+            .filter((c) => !chuoAreasRaw.length || String(c?.code ?? "") !== "12101")
+            .filter((c) => !hanamigawaAreasRaw.length || String(c?.code ?? "") !== "12102")
+            .filter((c) => !inageAreasRaw.length || String(c?.code ?? "") !== "12103")
+            .filter((c) => !wakabaAreasRaw.length || String(c?.code ?? "") !== "12104")
+            .filter((c) => !midoriAreasRaw.length || String(c?.code ?? "") !== "12105")
+            .filter((c) => !mihamaAreasRaw.length || String(c?.code ?? "") !== "12106"),
+          ...(chuoAreasRaw.length ? chuoAreasRaw : []),
+          ...(hanamigawaAreasRaw.length ? hanamigawaAreasRaw : []),
+          ...(inageAreasRaw.length ? inageAreasRaw : []),
+          ...(wakabaAreasRaw.length ? wakabaAreasRaw : []),
+          ...(midoriAreasRaw.length ? midoriAreasRaw : []),
+          ...(mihamaAreasRaw.length ? mihamaAreasRaw : []),
+        ]
+        : base;
+    for (const c of citiesAll) setCitySelected("12", c.code, t.checked);
+    if (chuoAreasRaw.length) setCitySelected("12", "12101", false);
+    if (hanamigawaAreasRaw.length) setCitySelected("12", "12102", false);
+    if (inageAreasRaw.length) setCitySelected("12", "12103", false);
+    if (wakabaAreasRaw.length) setCitySelected("12", "12104", false);
+    if (midoriAreasRaw.length) setCitySelected("12", "12105", false);
+    if (mihamaAreasRaw.length) setCitySelected("12", "12106", false);
+    updateSummary();
+    renderCities();
+    return;
+  }
+
+  // 千葉：千葉市（全選択）チェックボックス（各区のみ対象）
+  if (t instanceof HTMLInputElement && t.matches("input.chibaCitySelectAll")) {
+    if (state.selectedPrefCode !== "12") return;
+    const chuoAreasRaw = (typeof CHIBA_CHUO_AREAS !== "undefined" && Array.isArray(CHIBA_CHUO_AREAS)) ? CHIBA_CHUO_AREAS : [];
+    const mihamaAreasRaw = (typeof CHIBA_MIHAMA_AREAS !== "undefined" && Array.isArray(CHIBA_MIHAMA_AREAS)) ? CHIBA_MIHAMA_AREAS : [];
+    const hanamigawaAreasRaw = (typeof CHIBA_HANAMIGAWA_AREAS !== "undefined" && Array.isArray(CHIBA_HANAMIGAWA_AREAS)) ? CHIBA_HANAMIGAWA_AREAS : [];
+    const inageAreasRaw = (typeof CHIBA_INAGE_AREAS !== "undefined" && Array.isArray(CHIBA_INAGE_AREAS)) ? CHIBA_INAGE_AREAS : [];
+    const wakabaAreasRaw = (typeof CHIBA_WAKABA_AREAS !== "undefined" && Array.isArray(CHIBA_WAKABA_AREAS)) ? CHIBA_WAKABA_AREAS : [];
+    const midoriAreasRaw = (typeof CHIBA_MIDORI_AREAS !== "undefined" && Array.isArray(CHIBA_MIDORI_AREAS)) ? CHIBA_MIDORI_AREAS : [];
+    const allCities = getPoolForPref("12");
+    const wards = allCities.filter((c) => {
+      const code = String(c?.code ?? "");
+      return (hanamigawaAreasRaw.length ? code.startsWith("12102-") : code === "12102")
+        || (inageAreasRaw.length ? code.startsWith("12103-") : code === "12103")
+        || (wakabaAreasRaw.length ? code.startsWith("12104-") : code === "12104")
+        || (midoriAreasRaw.length ? code.startsWith("12105-") : code === "12105")
+        || code.startsWith("12101-")
+        || (mihamaAreasRaw.length ? code.startsWith("12106-") : code === "12106");
+    });
+    for (const c of wards) setCitySelected("12", c.code, t.checked);
+    if (chuoAreasRaw.length) setCitySelected("12", "12101", false);
+    if (hanamigawaAreasRaw.length) setCitySelected("12", "12102", false);
+    if (inageAreasRaw.length) setCitySelected("12", "12103", false);
+    if (wakabaAreasRaw.length) setCitySelected("12", "12104", false);
+    if (midoriAreasRaw.length) setCitySelected("12", "12105", false);
+    if (mihamaAreasRaw.length) setCitySelected("12", "12106", false);
+    updateSummary();
+    renderCities();
+    return;
+  }
+
+  // 千葉：千葉県（全選択）チェックボックス
+  if (t instanceof HTMLInputElement && t.matches("input.chibaPrefSelectAll")) {
+    if (state.selectedPrefCode !== "12") return;
+    const checked = t.checked;
+    const allCities = getPoolForPref("12");
+    for (const c of allCities) setCitySelected("12", c.code, checked);
+    updateSummary();
+    renderCities();
+    return;
+  }
+
+  // 千葉：流山市（全選択）チェックボックス
+  if (t instanceof HTMLInputElement && t.matches("input.chibaNagareyamaSelectAll")) {
+    if (state.selectedPrefCode !== "12") return;
+    if (typeof CHIBA_NAGAREYAMA_AREAS === "undefined" || !Array.isArray(CHIBA_NAGAREYAMA_AREAS)) return;
+    const checked = t.checked;
+    for (const c of CHIBA_NAGAREYAMA_AREAS) setCitySelected("12", c.code, checked);
     updateSummary();
     renderCities();
     return;
@@ -5389,14 +5579,24 @@ document.addEventListener("change", (e) => {
     const checked = t.checked;
     const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
     const otherWardsRaw = wardsRaw.filter(
-      (c) => c?.code !== "11103" && c?.code !== "11104" && c?.code !== "11105" && c?.code !== "11106" && c?.code !== "11107"
+      (c) => c?.code !== "11102" && c?.code !== "11103" && c?.code !== "11104" && c?.code !== "11105" && c?.code !== "11106" && c?.code !== "11107" && c?.code !== "11108"
     );
+    const kitaWardRaw = wardsRaw.filter((c) => c?.code === "11102");
+    const kitaAreasRaw = (typeof SAITAMA_KITA_AREAS !== "undefined" && Array.isArray(SAITAMA_KITA_AREAS)) ? SAITAMA_KITA_AREAS : [];
+    const kitaPoolRaw = kitaAreasRaw.length ? kitaAreasRaw : kitaWardRaw;
     const omiyaAreasRaw = Array.isArray(SAITAMA_OMIYA_AREAS) ? SAITAMA_OMIYA_AREAS : [];
     const urawaAreasRaw = Array.isArray(SAITAMA_URAWA_AREAS) ? SAITAMA_URAWA_AREAS : [];
     const chuoAreasRaw = Array.isArray(SAITAMA_CHUO_AREAS) ? SAITAMA_CHUO_AREAS : [];
     const minumaWardRaw = wardsRaw.filter((c) => c?.code === "11104");
+    const minumaAreasRaw = (typeof SAITAMA_MINUMA_AREAS !== "undefined" && Array.isArray(SAITAMA_MINUMA_AREAS)) ? SAITAMA_MINUMA_AREAS : [];
+    const minumaPoolRaw = minumaAreasRaw.length ? minumaAreasRaw : minumaWardRaw;
     const sakuraWardRaw = wardsRaw.filter((c) => c?.code === "11106");
-    const pool = [...otherWardsRaw, ...omiyaAreasRaw, ...urawaAreasRaw, ...chuoAreasRaw, ...minumaWardRaw, ...sakuraWardRaw];
+    const sakuraAreasRaw = (typeof SAITAMA_SAKURA_AREAS !== "undefined" && Array.isArray(SAITAMA_SAKURA_AREAS)) ? SAITAMA_SAKURA_AREAS : [];
+    const sakuraPoolRaw = sakuraAreasRaw.length ? sakuraAreasRaw : sakuraWardRaw;
+    const minamiWardRaw = wardsRaw.filter((c) => c?.code === "11108");
+    const minamiAreasRaw = (typeof SAITAMA_MINAMI_AREAS !== "undefined" && Array.isArray(SAITAMA_MINAMI_AREAS)) ? SAITAMA_MINAMI_AREAS : [];
+    const minamiPoolRaw = minamiAreasRaw.length ? minamiAreasRaw : minamiWardRaw;
+    const pool = [...otherWardsRaw, ...kitaPoolRaw, ...omiyaAreasRaw, ...urawaAreasRaw, ...chuoAreasRaw, ...minumaPoolRaw, ...sakuraPoolRaw, ...minamiPoolRaw];
     for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
@@ -5436,12 +5636,29 @@ document.addEventListener("change", (e) => {
     return;
   }
 
+  // 埼玉：北区（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.kitaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
+    const checked = t.checked;
+    const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
+    const kitaWardRaw = wardsRaw.filter((c) => c?.code === "11102");
+    const kitaAreasRaw = (typeof SAITAMA_KITA_AREAS !== "undefined" && Array.isArray(SAITAMA_KITA_AREAS)) ? SAITAMA_KITA_AREAS : [];
+    const pool = kitaAreasRaw.length ? kitaAreasRaw : kitaWardRaw;
+    for (const c of pool) setCitySelected("11", c.code, checked);
+    updateSummary();
+    renderCities();
+    return;
+  }
+
   // 埼玉：見沼区（区）（全選択）
   if (t instanceof HTMLInputElement && t.matches("input.minumaAreaSelectAll")) {
     if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    // 現状は区単体（11104）
-    setCitySelected("11", "11104", checked);
+    const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
+    const minumaWardRaw = wardsRaw.filter((c) => c?.code === "11104");
+    const minumaAreasRaw = (typeof SAITAMA_MINUMA_AREAS !== "undefined" && Array.isArray(SAITAMA_MINUMA_AREAS)) ? SAITAMA_MINUMA_AREAS : [];
+    const pool = minumaAreasRaw.length ? minumaAreasRaw : minumaWardRaw;
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
@@ -5451,137 +5668,133 @@ document.addEventListener("change", (e) => {
   if (t instanceof HTMLInputElement && t.matches("input.sakuraAreaSelectAll")) {
     if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    // 現状は区単体（11106）
-    setCitySelected("11", "11106", checked);
+    const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
+    const sakuraWardRaw = wardsRaw.filter((c) => c?.code === "11106");
+    const sakuraAreasRaw = (typeof SAITAMA_SAKURA_AREAS !== "undefined" && Array.isArray(SAITAMA_SAKURA_AREAS)) ? SAITAMA_SAKURA_AREAS : [];
+    const pool = sakuraAreasRaw.length ? sakuraAreasRaw : sakuraWardRaw;
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：千葉県（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaPrefSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：南区（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.minamiAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    for (const c of CHIBA_ALL_CITIES) setCitySelected("12", c.code, checked);
+    const wardsRaw = Array.isArray(SAITAMA_SAITAMA_CITY_WARDS) ? SAITAMA_SAITAMA_CITY_WARDS : [];
+    const minamiWardRaw = wardsRaw.filter((c) => c?.code === "11108");
+    const minamiAreasRaw = (typeof SAITAMA_MINAMI_AREAS !== "undefined" && Array.isArray(SAITAMA_MINAMI_AREAS)) ? SAITAMA_MINAMI_AREAS : [];
+    const pool = minamiAreasRaw.length ? minamiAreasRaw : minamiWardRaw;
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：10地域（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaAreaSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
-    const areaName = t.getAttribute("data-area") || "";
+  // 埼玉：和光市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.wakoAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const raw = (typeof CHIBA_GROUPED === "object" && CHIBA_GROUPED)
-      ? (CHIBA_GROUPED[areaName] ?? [])
-      : [];
-    const pool = (areaName === "東葛飾地域")
-      ? [
-        ...raw,
-        ...(Array.isArray(CHIBA_MATSUDO_AREAS) ? CHIBA_MATSUDO_AREAS : []),
-        ...(Array.isArray(CHIBA_KASHIWA_AREAS) ? CHIBA_KASHIWA_AREAS : []),
-        ...(Array.isArray(CHIBA_NAGAREYAMA_AREAS) ? CHIBA_NAGAREYAMA_AREAS : []),
-      ]
-      : (areaName === "葛南地域")
-        ? [
-          ...raw,
-          ...(Array.isArray(CHIBA_ICHIKAWA_AREAS) ? CHIBA_ICHIKAWA_AREAS : []),
-          ...(Array.isArray(CHIBA_FUNABASHI_AREAS) ? CHIBA_FUNABASHI_AREAS : []),
-          ...(Array.isArray(CHIBA_YACHIYO_AREAS) ? CHIBA_YACHIYO_AREAS : []),
-          ...(Array.isArray(CHIBA_URAYASU_AREAS) ? CHIBA_URAYASU_AREAS : []),
-          ...(Array.isArray(CHIBA_NARASHINO_AREAS) ? CHIBA_NARASHINO_AREAS : []),
-        ]
-        : raw;
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_WAKO_AREAS !== "undefined" && Array.isArray(SAITAMA_WAKO_AREAS)) ? SAITAMA_WAKO_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11229", name: "和光市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：松戸市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaMatsudoSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：川口市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.kawaguchiAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_MATSUDO_AREAS) ? CHIBA_MATSUDO_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_KAWAGUCHI_AREAS !== "undefined" && Array.isArray(SAITAMA_KAWAGUCHI_AREAS)) ? SAITAMA_KAWAGUCHI_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11203", name: "川口市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：柏市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaKashiwaSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：川越市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.kawagoeAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_KASHIWA_AREAS) ? CHIBA_KASHIWA_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_KAWAGOE_AREAS !== "undefined" && Array.isArray(SAITAMA_KAWAGOE_AREAS)) ? SAITAMA_KAWAGOE_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11201", name: "川越市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：流山市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaNagareyamaSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：東松山市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.higashimatsuyamaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_NAGAREYAMA_AREAS) ? CHIBA_NAGAREYAMA_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_HIGASHIMATSUYAMA_AREAS !== "undefined" && Array.isArray(SAITAMA_HIGASHIMATSUYAMA_AREAS)) ? SAITAMA_HIGASHIMATSUYAMA_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11212", name: "東松山市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：市川市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaIchikawaSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：日高市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.hidakaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_ICHIKAWA_AREAS) ? CHIBA_ICHIKAWA_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_HIDAKA_AREAS !== "undefined" && Array.isArray(SAITAMA_HIDAKA_AREAS)) ? SAITAMA_HIDAKA_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11242", name: "日高市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：船橋市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaFunabashiSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：所沢市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.tokorozawaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_FUNABASHI_AREAS) ? CHIBA_FUNABASHI_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_TOKOROZAWA_AREAS !== "undefined" && Array.isArray(SAITAMA_TOKOROZAWA_AREAS)) ? SAITAMA_TOKOROZAWA_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11208", name: "所沢市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：八千代市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaYachiyoSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：狭山市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.sayamaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_YACHIYO_AREAS) ? CHIBA_YACHIYO_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_SAYAMA_AREAS !== "undefined" && Array.isArray(SAITAMA_SAYAMA_AREAS)) ? SAITAMA_SAYAMA_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11215", name: "狭山市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：習志野市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaNarashinoSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：飯能市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.hannoAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_NARASHINO_AREAS) ? CHIBA_NARASHINO_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_HANNO_AREAS !== "undefined" && Array.isArray(SAITAMA_HANNO_AREAS)) ? SAITAMA_HANNO_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11209", name: "飯能市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
   }
 
-  // 千葉：浦安市（地名）（全選択）
-  if (t instanceof HTMLInputElement && t.matches("input.chibaUrayasuSelectAll")) {
-    if (state.selectedPrefCode !== "12") return;
+  // 埼玉：吉川市（町名）（全選択）
+  if (t instanceof HTMLInputElement && t.matches("input.yoshikawaAreaSelectAll")) {
+    if (state.selectedPrefCode !== "11") return;
     const checked = t.checked;
-    const pool = Array.isArray(CHIBA_URAYASU_AREAS) ? CHIBA_URAYASU_AREAS : [];
-    for (const c of pool) setCitySelected("12", c.code, checked);
+    const areasRaw = (typeof SAITAMA_YOSHIKAWA_AREAS !== "undefined" && Array.isArray(SAITAMA_YOSHIKAWA_AREAS)) ? SAITAMA_YOSHIKAWA_AREAS : [];
+    const pool = areasRaw.length ? areasRaw : [{ code: "11243", name: "吉川市" }];
+    for (const c of pool) setCitySelected("11", c.code, checked);
     updateSummary();
     renderCities();
     return;
@@ -6097,9 +6310,7 @@ document.addEventListener("change", (e) => {
       clearPrefSelections(t.value);
 
       if (state.selectedPrefCode === t.value) {
-        // 他にチェック済みがあれば、そちらへフォーカスを移す（勤務地/最寄り駅とも自然）
-        const next = document.querySelector('input[name="pref"]:checked');
-        state.selectedPrefCode = next ? next.value : "";
+        state.selectedPrefCode = "";
         renderCities();
         updateSummary();
       } else {
@@ -6120,6 +6331,7 @@ document.addEventListener("change", (e) => {
 
   // station/pref/employment/salary/skill の簡易チェック
   if (t instanceof HTMLInputElement && t.matches('input[name="simpleOpt"]')) {
+    if (!isSimpleTab(state.activeTab)) return;
     const set = getSimpleSelectedSet(state.activeTab);
     if (set) {
       if (t.checked) set.add(t.value);
@@ -6209,7 +6421,9 @@ $("#clearBtn").addEventListener("click", () => {
     return;
   }
 
-  document.querySelectorAll('input[name="pref"]').forEach((x) => x.checked = false);
+  document.querySelectorAll('input[name="pref"]').forEach((x) => {
+    if (x instanceof HTMLInputElement) x.checked = false;
+  });
   updateSelectedCount();
 
   state.selectedPrefCode = "";
@@ -6230,14 +6444,10 @@ $("#searchBtn").addEventListener("click", () => {
     jobKeys: Array.from(state.selectedJobs),
   });
 
-  // 入口ページで表示できるように保存（現在のタブに依存せず全項目を保存）
-  persistSelectionForEntry();
-  persistJobSelectionForEntry();
-  persistSimpleSelectionForEntry("station");
-  persistSimpleSelectionForEntry("pref");
-  persistSimpleSelectionForEntry("employment");
-  persistSimpleSelectionForEntry("salary");
-  persistSimpleSelectionForEntry("skill");
+  // 入口ページで表示できるように保存
+  if (state.activeTab === "job") persistJobSelectionForEntry();
+  else if (isSimpleTab(state.activeTab)) persistSimpleSelectionForEntry(state.activeTab);
+  else persistSelectionForEntry();
   // デモ：検索実行後はリンク元へ戻す
   backToEntry();
 });
@@ -6256,8 +6466,8 @@ $("#closeBtn").addEventListener("click", () => {
   const saveBtn = document.getElementById("badSaveBtn");
   const groupContainer = document.getElementById("badRegionContainer");
   const listEl = document.getElementById("badList");
-  const searchEl = document.getElementById("badSearch");
-  const onlyEl = document.getElementById("badOnlySelected");
+  const searchEl = /** @type {HTMLInputElement|null} */ (document.getElementById("badSearch"));
+  const onlyEl = /** @type {HTMLInputElement|null} */ (document.getElementById("badOnlySelected"));
   const countEl = document.getElementById("badSelectedCount");
   const summaryEl = document.getElementById("badSelectedSummary");
   const titleEl = document.getElementById("badPrefTitle");
@@ -6361,7 +6571,8 @@ $("#closeBtn").addEventListener("click", () => {
   });
 
   groupContainer.addEventListener("click", (e) => {
-    const btn = e.target.closest?.("button[data-bad-group]");
+    const t = /** @type {Element|null} */ (e.target);
+    const btn = t?.closest?.("button[data-bad-group]");
     if (!(btn instanceof HTMLButtonElement)) return;
     const g = btn.getAttribute("data-bad-group") || "";
     state.badPrefActiveGroup = g;
@@ -6391,6 +6602,44 @@ $("#closeBtn").addEventListener("click", () => {
   saveBtn.addEventListener("click", () => {
     persistBadPrefSelection();
     close();
+  });
+})();
+
+// ====== 埼玉県：市区町村区分マップ モーダル ======
+(() => {
+  const backdrop = document.getElementById("saitamaMapBackdrop");
+  const closeBtn = document.getElementById("saitamaMapCloseBtn");
+  const frame = /** @type {HTMLIFrameElement|null} */ (document.getElementById("saitamaMapFrame"));
+  if (!backdrop || !closeBtn || !frame) return;
+
+  function open() {
+    // iframe の再読み込みを促して最新を表示（画像を置いた直後など）
+    try {
+      frame.src = frame.src;
+    } catch {
+      // noop
+    }
+    backdrop.hidden = false;
+  }
+
+  function close() {
+    backdrop.hidden = true;
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = /** @type {Element|null} */ (e.target);
+    const btn = t?.closest?.("button[data-open-saitama-map]");
+    if (!(btn instanceof HTMLButtonElement)) return;
+    // 埼玉県の見出しを押した時だけ開く
+    if (state.selectedPrefCode !== "11") return;
+    open();
+  });
+
+  closeBtn.addEventListener("click", close);
+
+  // 背景クリックで閉じる（モーダル本体クリックは無視）
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
   });
 })();
 

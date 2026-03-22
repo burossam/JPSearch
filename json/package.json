@@ -1,0 +1,19 @@
+{
+  "name": "jpsearch-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "_ensure:node_modules": "node ../tools/lib/ensure_root_node_modules.mjs",
+    "geojson:validate:pref-boundaries": "node ../tools/validate_prefecture_boundaries_geojson.mjs",
+    "db:export:pref-stats": "npm run _ensure:node_modules && node ../tools/export_prefecture_stats.mjs",
+    "db:refresh:aggregates": "npm run _ensure:node_modules && node ../tools/refresh_aggregates.mjs",
+    "etl:normalize": "npm run _ensure:node_modules && node ../tools/etl_normalize_raw_job_postings.mjs",
+    "geojson:merge:pref-jobcount": "npm run _ensure:node_modules && node ../tools/merge_prefecture_stats_into_geojson.mjs",
+    "demo:choropleth": "npm run db:export:pref-stats && npm run geojson:merge:pref-jobcount",
+    "api:start": "npm run _ensure:node_modules && node ../server/index.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

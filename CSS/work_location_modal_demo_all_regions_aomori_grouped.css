@@ -12,6 +12,102 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   z-index: 9999;
 }
 
+/* ===== Skill picker ===== */
+.skillPicker{
+  display:grid;
+  grid-template-columns: 320px 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items:start;
+  padding: 8px 10px;
+}
+
+.skillPickerMenu{
+  border-right: 1px solid #d1d5db;
+  padding-right: 10px;
+}
+
+.skillMenuBtn{
+  width:100%;
+  text-align:left;
+  border:0;
+  border-bottom:1px solid #d1d5db;
+  background:#fff;
+  padding:12px 10px;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.skillMenuBtn.active{
+  background:#efefef;
+  font-weight:900;
+}
+
+.skillPickerArrow{
+  color:#ff5a3c;
+  font-size:34px;
+  font-weight:900;
+  line-height:1;
+  padding-top: 42px;
+  text-align:center;
+}
+
+.skillPickerPanel{
+  background:#f3f4f6;
+  border-radius:4px;
+  padding:14px 16px;
+}
+
+.skillOptionsGrid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 34px;
+  row-gap: 16px;
+  align-items:start;
+}
+
+.skillOptionItem{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:14px;
+  color:#111827;
+  cursor:pointer;
+}
+
+.skillOptionItem input{
+  margin:0;
+}
+
+.skillOptionName{
+  line-height:1.3;
+}
+
+.skillOptionCount{
+  color:#ff5a3c;
+  font-size:12px;
+  line-height:1.3;
+}
+
+@media (max-width: 960px){
+  .skillPicker{
+    grid-template-columns: 1fr;
+  }
+
+  .skillPickerMenu{
+    border-right:0;
+    padding-right:0;
+  }
+
+  .skillPickerArrow{
+    display:none;
+  }
+
+  .skillOptionsGrid{
+    grid-template-columns: 1fr;
+  }
+}
+
 .modalBackdrop[hidden]{
   display:none;
 }
@@ -43,6 +139,11 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   grid-template-columns: 340px 1fr;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* station：都道府県選択の横幅を半分に */
+.modal.stationMode .content{
+  grid-template-columns: 170px 1fr;
 }
 
 /* station/pref/employment/salary/skill の簡易タブは、左を畳んで右をフル幅にする */
@@ -140,9 +241,31 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .rightTitle{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
 #prefTitle{ font-size: 18px; font-weight: 1000; }
-#prefTitle .prefTitleLink{ color: inherit; text-decoration: none; }
+#prefTitle .prefTitleLink{
+  color: inherit;
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
 #prefTitle .prefTitleLink:hover{ text-decoration: underline; }
 .muted{ color:#6b7280; font-size: 12px; font-weight:800; }
+
+/* 埼玉県：地図モーダル */
+.modal.mapOnly{
+  width: 98vw;
+  height: 94vh;
+}
+
+.modal.mapOnly .header{ padding: 10px 12px; }
+
+.mapModalBody{ flex: 1 1 auto; min-height: 0; padding: 6px; }
+.modal.mapOnly .mapModalBody{ padding: 4px; }
+
+.mapModalFrame{ width: 100%; height: 100%; border: 1px solid #e5e7eb; border-radius: 10px; }
+.modal.mapOnly .mapModalFrame{ border: 0; border-radius: 8px; }
 
 .tools{ display:flex; gap: 12px; align-items:center; flex-wrap:wrap; }
 .search{ width: 260px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; }
@@ -576,6 +699,39 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   gap: 12px;
 }
 
+/* 千葉：左に全選択チェック、右に件数（右カラム内で左寄せ） */
+.sectionTitleRow--chiba{
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.sectionTitleRow--chiba .areaHeaderRight{
+  flex: 0 0 84px;
+  margin-left: auto;
+  justify-content: flex-start;
+}
+
+.sectionTitleRow--chiba .badge{
+  margin-left: 0;
+}
+
+.chibaCityHead{
+  grid-column: 1 / -1;
+  padding: 6px 8px 2px;
+  padding-left: 28px;
+  font-weight: 1000;
+}
+
+.chibaCityTitle{
+  font-size: 12px;
+  font-weight: 1000;
+  color: #111827;
+}
+
+.cityItem.cityItem--chibaWard{
+  padding-left: 34px;
+}
+
 .areaHeaderLeft{
   flex: 0 0 auto;
   display:flex;
@@ -598,14 +754,13 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 .cityGrid{
-  flex: 1 1 auto;
+  border: none;
   min-height: 0;
   overflow:auto;
   padding: 12px 4px;
   display:grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px 16px;
-  border: 2px solid #ef4444; /* 赤枠の確認用。不要なら消してOK */
   border-radius: 8px;
 }
 
@@ -692,6 +847,13 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 .cityName ruby{ ruby-position: over; }
 
 .cityName ruby rt{
+  font-size: 12px;
+  font-weight: 900;
+  color:#6b7280;
+}
+
+/* 括弧内の読み仮名（例：青葉町（<rb>あおばちょう</rb>）） */
+.cityName RB{
   font-size: 12px;
   font-weight: 900;
   color:#6b7280;

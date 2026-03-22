@@ -3,142 +3,144 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>勤務地モーダル Demo（全地方アコーディオン / 北海道&青森 分割表示）</title>
-  <link rel="stylesheet" href="../CSS/work_location_modal_demo_all_regions_aomori_grouped.css?v=20260305_5" />
+  <title>勤務地モーダルデモ（全都道府県 / 青森 grouped）</title>
+  <link rel="stylesheet" href="../CSS/work_location_modal_demo_all_regions_aomori_grouped.css?v=20260322_1" />
+    <script src="../JS/work_location_modal_demo_all_regions_aomori_grouped.data.js?v=20260322_1" defer></script>
+    <script src="../JS/work_location_modal_demo_all_regions_aomori_grouped.js?v=20260322_1" defer></script>
 </head>
-
 <body>
-  <div class="modal">
-    <div class="header">
-      <div class="tabs">
-        <button class="tab active" type="button" data-tab="work">勤務地</button>
-        <button class="tab" type="button" data-tab="station">最寄り駅</button>
-        <button class="tab" type="button" data-tab="job">職種</button>
-        <button class="tab" type="button" data-tab="pref">こだわり条件</button>
-        <button class="tab" type="button" data-tab="employment">雇用形態</button>
-        <button class="tab" type="button" data-tab="salary">手取り給料</button>
-        <button class="tab" type="button" data-tab="skill">スキル</button>
-      </div>
-      <button id="closeBtn" class="close" title="閉じる" type="button">×</button>
-    </div>
-
-    <div class="content">
-      <aside class="left">
-        <div class="titleRow">
-          <h3 id="leftTitle" style="margin:0;">都道府県選択</h3>
-          <span id="selectedCount" class="pill">0件</span>
+  <div class="modalBackdrop" aria-label="検索条件モーダル">
+    <div class="modal">
+      <div class="header">
+        <div class="tabs" role="tablist" aria-label="条件タブ">
+          <button class="tab active" type="button" data-tab="work">勤務地</button>
+          <button class="tab" type="button" data-tab="job">職種</button>
+          <button class="tab" type="button" data-tab="station">最寄り駅</button>
+          <button class="tab" type="button" data-tab="pref">こだわり条件</button>
+          <button class="tab" type="button" data-tab="employment">雇用形態</button>
+          <button class="tab" type="button" data-tab="salary">手取り給料</button>
+          <button class="tab" type="button" data-tab="skill">スキル</button>
         </div>
+        <button id="closeBtn" class="close" type="button" aria-label="閉じる">×</button>
+      </div>
 
-        <div id="regionContainer"></div>
+      <div class="content">
+        <aside class="left" aria-label="左サイド">
+          <div class="titleRow">
+            <div id="leftTitle">都道府県選択</div>
+            <div id="leftHelp" class="pill">チェックで選択</div>
+          </div>
+          <div id="regionContainer"></div>
+        </aside>
 
-        <p id="leftHelp" style="margin:14px 0 0; color:#6b7280; font-size:12px; line-height:1.6;">
-          ✅ 左は「東北〜沖縄まで全地方・全都道府県」を折りたたみで表示。<br/>
-          ✅ 右は「北海道：札幌10区＋道東/道北/道央/道南」「青森：青森市（区分）＋その他」を分割表示。<br/>
-          ※このデモはUI仕上がり確認用です（実データはCSV/JSONから全件生成推奨）
-        </p>
-      </aside>
-
-      <main class="right">
-        <div class="rightHead">
-          <div class="rightTitle">
-            <span id="prefTitle">未選択</span>
-            <span id="cityCount" class="muted"></span>
+        <main class="right" aria-label="右サイド">
+          <div class="rightHead">
+            <div class="rightTitle">
+              <div id="prefTitle">未選択</div>
+              <div id="cityCount" class="muted"></div>
+            </div>
+            <div class="tools">
+              <input id="citySearch" class="search" type="search" placeholder="市区町村を検索" />
+              <label class="onlyWrap"><input id="onlySelected" type="checkbox" /> 選択済みのみ</label>
+              <button id="badPrefBtn" class="btn ghost" type="button">悪（除外）</button>
+            </div>
           </div>
 
-          <div class="tools">
-            <button id="badPrefBtn" class="btn ghost" type="button" style="padding:10px 12px; display:none;">悪</button>
-            <label id="stationAreaWrap" class="areaLeft" style="display:none;">
-              <span class="areaLabel">エリア</span>
-              <select id="stationAreaSelect" class="areaSelect"></select>
-            </label>
-            <input id="citySearch" class="search" placeholder="市区町村を検索" />
-            <label class="onlyWrap"><input id="onlySelected" type="checkbox" />選択中のみ</label>
+          <div id="stationAreaWrap" class="areaBar" style="display:none;">
+            <div class="areaLeft">
+              <div class="areaLabel">エリア</div>
+              <select id="stationAreaSelect" class="areaSelect" aria-label="駅エリア"></select>
+            </div>
           </div>
-        </div>
 
-        <div id="areaBar" class="areaBar" hidden>
-          <label class="areaLeft">
-            <span id="areaLabel" class="areaLabel">エリア</span>
-            <select id="areaSelect" class="areaSelect"></select>
-          </label>
-          <div id="areaCount" class="areaCount"></div>
-        </div>
+          <div id="areaBar" class="areaBar" hidden>
+            <div class="areaLeft">
+              <div id="areaLabel" class="areaLabel">エリア</div>
+              <select id="areaSelect" class="areaSelect" aria-label="エリア"></select>
+            </div>
+            <div id="areaCount" class="areaCount"></div>
+          </div>
 
-        <div id="cityList" class="cityGrid">
-          <div class="empty">左で都道府県を選択すると、右に市区町村が表示されます</div>
-        </div>
-      </main>
-    </div>
-
-    <div class="footer">
-      <div style="min-width:0;">
-        <div class="label">選択中</div>
-        <div id="selectedSummary" class="summary">未選択</div>
+          <div id="cityList" class="cityGrid" aria-label="一覧"></div>
+        </main>
       </div>
-      <div class="actions">
-        <button id="clearBtn" class="btn ghost" type="button">クリア</button>
-        <button id="searchBtn" class="btn primary" type="button">選択</button>
+
+      <div class="footer" aria-label="フッター">
+        <div>
+          <div class="label">選択</div>
+          <div id="selectedCount" class="summary">0件</div>
+          <div id="selectedSummary" class="summary">未選択</div>
+        </div>
+        <div class="actions">
+          <button id="clearBtn" class="btn ghost" type="button">クリア</button>
+          <button id="searchBtn" class="btn primary" type="button">検索する</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- 悪（除外）こだわり条件：専用モーダル -->
   <div id="badPrefModalBackdrop" class="modalBackdrop" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-label="悪（除外）こだわり条件">
+    <div class="modal" aria-label="悪（除外）こだわり条件">
       <div class="header">
         <div class="tabs">
-          <div class="fw" style="font-weight:1000;">悪（除外）こだわり条件</div>
+          <div id="badPrefTitle">悪（除外）</div>
+          <div id="badCount" class="pill"></div>
         </div>
-        <button id="badPrefCloseBtn" class="close" title="閉じる" type="button">×</button>
+        <button id="badPrefCloseBtn" class="close" type="button" aria-label="閉じる">×</button>
       </div>
 
       <div class="content">
         <aside class="left">
           <div class="titleRow">
-            <h3 id="badLeftTitle" style="margin:0;">条件を選ぶ</h3>
-            <span id="badSelectedCount" class="pill">0件</span>
+            <div>グループ</div>
           </div>
-
           <div id="badRegionContainer"></div>
-
-          <p id="badLeftHelp" style="margin:14px 0 0; color:#6b7280; font-size:12px; line-height:1.6;">
-            ✅ 「悪」は除外したい条件（NG）を選ぶデモです。
-          </p>
         </aside>
 
         <main class="right">
           <div class="rightHead">
             <div class="rightTitle">
-              <span id="badPrefTitle">悪（除外）</span>
-              <span id="badCount" class="muted"></span>
+              <div class="muted">選択</div>
+              <div id="badSelectedCount" class="pill">0件</div>
             </div>
-
             <div class="tools">
-              <input id="badSearch" class="search" placeholder="条件を検索" />
-              <label class="onlyWrap"><input id="badOnlySelected" type="checkbox" />選択中のみ</label>
+              <input id="badSearch" class="search" type="search" placeholder="条件を検索" />
+              <label class="onlyWrap"><input id="badOnlySelected" type="checkbox" /> 選択済みのみ</label>
             </div>
           </div>
 
-          <div id="badList" class="cityGrid">
-            <div class="empty">条件を読み込み中…</div>
+          <div id="badList" class="cityGrid"></div>
+
+          <div class="footer">
+            <div>
+              <div class="label">選択内容</div>
+              <div id="badSelectedSummary" class="summary">未選択</div>
+            </div>
+            <div class="actions">
+              <button id="badClearBtn" class="btn ghost" type="button">クリア</button>
+              <button id="badSaveBtn" class="btn primary" type="button">保存</button>
+            </div>
           </div>
         </main>
-      </div>
-
-      <div class="footer">
-        <div style="min-width:0;">
-          <div class="label">選択中</div>
-          <div id="badSelectedSummary" class="summary">未選択</div>
-        </div>
-        <div class="actions">
-          <button id="badClearBtn" class="btn ghost" type="button">クリア</button>
-          <button id="badSaveBtn" class="btn primary" type="button">選択</button>
-        </div>
       </div>
     </div>
   </div>
 
-  <script src="../JS/work_location_modal_demo_all_regions_aomori_grouped.data.js?v=20260305_1"></script>
-  <script src="../JS/work_location_modal_demo_all_regions_aomori_grouped.js?v=20260305_5"></script>
+  <div id="saitamaMapBackdrop" class="modalBackdrop" hidden>
+    <div class="modal mapOnly" aria-label="埼玉県マップ">
+      <div class="header">
+        <div class="tabs">埼玉県：市区町村区分マップ</div>
+        <button id="saitamaMapCloseBtn" class="close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="mapModalBody">
+        <iframe
+          id="saitamaMapFrame"
+          class="mapModalFrame"
+          src="../assets/saitama_map.html"
+          title="埼玉県：市区町村区分マップ"
+        ></iframe>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

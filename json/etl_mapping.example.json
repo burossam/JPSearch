@@ -1,0 +1,20 @@
+{
+  "title": ["title", "jobTitle"],
+  "collectedAt": ["collectedAt", "collected_at"],
+  "sourceJobId": ["sourceJobId", "id", "jobId"],
+
+  "companyName": ["companyName", "company.name"],
+  "industry": ["industry", "company.industry"],
+  "employmentType": ["employmentType", "employment.type"],
+  "jobCategory": ["jobCategory", "category"],
+
+  "municipalityCode": ["municipalityCode", "location.municipalityCode"],
+
+  "salaryMin": ["salaryMin", "salary.min"],
+  "salaryMax": ["salaryMax", "salary.max"],
+
+  "description": ["description"],
+  "postedAt": ["postedAt", "posted_at"],
+  "isActive": ["isActive", "active"],
+  "skills": ["skills"]
+}

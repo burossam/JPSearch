@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: jpsearch-db
+    environment:
+      POSTGRES_USER: jps
+      POSTGRES_PASSWORD: jps
+      POSTGRES_DB: jps
+    ports:
+      - "5432:5432"
+    volumes:
+      - jpsearch_pgdata:/var/lib/postgresql/data
+
+volumes:
+  jpsearch_pgdata:

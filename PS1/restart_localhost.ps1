@@ -5,6 +5,29 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Write-ExceptionDetails([object]$err) {
+  try {
+    $e = $err.Exception
+    Write-Host "[error] $($e.GetType().FullName): $($e.Message)" -ForegroundColor Red
+    if ($err.InvocationInfo) {
+      Write-Host "[error] at: $($err.InvocationInfo.PositionMessage)" -ForegroundColor Red
+    }
+    if ($err.ScriptStackTrace) {
+      Write-Host "[error] ScriptStackTrace:`n$($err.ScriptStackTrace)" -ForegroundColor DarkRed
+    }
+
+    $inner = $e.InnerException
+    $depth = 0
+    while ($inner -and $depth -lt 8) {
+      $depth++
+      Write-Host "[error] InnerException#${depth}: $($inner.GetType().FullName): $($inner.Message)" -ForegroundColor DarkRed
+      $inner = $inner.InnerException
+    }
+  } catch {
+    Write-Host "[error] Failed to format error: $($_.Exception.Message)" -ForegroundColor Red
+  }
+}
+
 # このスクリプトを PS1/ に移動しても、常にリポジトリ直下を配信する
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
@@ -47,6 +70,11 @@ function Start-Server([int]$p, [string]$b) {
     return
   }
 
+  $python = Get-Command python -ErrorAction SilentlyContinue
+  if (-not $python) {
+    throw "python not found. Install Python or add it to PATH (make sure 'python --version' works)."
+  }
+
   $args = @('-m','http.server',"$p",'--bind',"$b")
   Write-Host "[start] python $($args -join ' ')"
 
@@ -58,5 +86,11 @@ function Start-Server([int]$p, [string]$b) {
   Start-Process $url
 }
 
-Stop-Listener -p $Port
-Start-Server -p $Port -b $Bind
+try {
+  Stop-Listener -p $Port
+  Start-Server -p $Port -b $Bind
+} catch {
+  Write-ExceptionDetails $_
+  exit 1
+}
+
